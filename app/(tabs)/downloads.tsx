@@ -10,14 +10,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Trash2, Play, Music, Pause, Plus } from 'lucide-react-native';
+import { Trash2, Play, Music, Pause } from 'lucide-react-native';
 import { downloadService, type DownloadedSong } from '../../services/downloadService';
 import { audioService, type PlaybackStatus } from '../../services/audioService';
 import { playbackService } from '../../services/playbackService';
 import { MiniPlayer } from '../../components/MiniPlayer';
 import { FullScreenPlayer } from '../../components/FullScreenPlayer';
-import { AddToPlaylistModal } from '../../components/AddToPlaylistModal';
-import { CreatePlaylistModal } from '../../components/CreatePlaylistModal';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 
@@ -25,9 +23,6 @@ export default function DownloadsScreen() {
   const [downloadedSongs, setDownloadedSongs] = useState<DownloadedSong[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFullPlayer, setShowFullPlayer] = useState(false);
-  const [showAddToPlaylistModal, setShowAddToPlaylistModal] = useState(false);
-  const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
-  const [selectedSong, setSelectedSong] = useState<DownloadedSong | null>(null);
   const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>({
     isPlaying: false,
     currentSong: null,
@@ -124,15 +119,6 @@ export default function DownloadsScreen() {
     }
   };
 
-  const handleAddToPlaylist = (song: DownloadedSong) => {
-    setSelectedSong(song);
-    setShowAddToPlaylistModal(true);
-  };
-
-  const handleCreatePlaylist = () => {
-    setShowCreatePlaylistModal(true);
-  };
-
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString();
   };
@@ -174,14 +160,6 @@ export default function DownloadsScreen() {
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleAddToPlaylist(song)}
-          activeOpacity={0.7}
-        >
-          <Plus size={18} color="#1DB954" />
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={[
             styles.playButton,
@@ -255,27 +233,6 @@ export default function DownloadsScreen() {
         <FullScreenPlayer 
           visible={showFullPlayer} 
           onClose={() => setShowFullPlayer(false)} 
-        />
-
-        <AddToPlaylistModal
-          visible={showAddToPlaylistModal}
-          song={selectedSong}
-          onClose={() => {
-            setShowAddToPlaylistModal(false);
-            setSelectedSong(null);
-          }}
-          onCreatePlaylist={handleCreatePlaylist}
-        />
-
-        <CreatePlaylistModal
-          visible={showCreatePlaylistModal}
-          onClose={() => setShowCreatePlaylistModal(false)}
-          onPlaylistCreated={() => {
-            showToast({
-              message: 'Playlist created successfully',
-              type: 'success',
-            });
-          }}
         />
 
         {toast && (
@@ -406,11 +363,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  actionButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(29, 185, 84, 0.1)',
   },
   playButton: {
     padding: 8,

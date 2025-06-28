@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ interface DraggablePlaylistSongProps {
   onDragStart?: (index: number) => void;
   onDragEnd?: (fromIndex: number, toIndex: number) => void;
   isDragging?: boolean;
-  draggedIndex?: number;
+  draggedIndex?: number | null;
 }
 
 export function DraggablePlaylistSong({
@@ -42,13 +42,19 @@ export function DraggablePlaylistSong({
   const pan = useRef(new Animated.ValueXY()).current;
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
+  const [isDraggingThis, setIsDraggingThis] = useState(false);
 
   const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (_, gestureState) => {
-      return Math.abs(gestureState.dy) > 10;
+      // Only start dragging if we're moving vertically more than horizontally
+      return Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && Math.abs(gestureState.dy) > 10;
     },
     onPanResponderGrant: () => {
+      setIsDraggingThis(true);
       onDragStart?.(index);
+      
+      // Animate the item to show it's being dragged
       Animated.parallel([
         Animated.spring(scale, {
           toValue: 1.05,
@@ -61,14 +67,19 @@ export function DraggablePlaylistSong({
       ]).start();
     },
     onPanResponderMove: (_, gestureState) => {
+      // Update the position
       pan.setValue({ x: 0, y: gestureState.dy });
     },
     onPanResponderRelease: (_, gestureState) => {
-      const itemHeight = 72; // Approximate height of each song item
+      setIsDraggingThis(false);
+      
+      // Calculate which position to move to
+      const itemHeight = 80; // Approximate height of each song item
       const moveThreshold = itemHeight / 2;
       const moveDistance = Math.round(gestureState.dy / itemHeight);
-      const newIndex = Math.max(0, index + moveDistance);
+      const newIndex = Math.max(0, Math.min(index + moveDistance, 100)); // Assuming max 100 items
 
+      // Only trigger reorder if we moved significantly and to a different position
       if (Math.abs(gestureState.dy) > moveThreshold && newIndex !== index) {
         onDragEnd?.(index, newIndex);
       }
@@ -105,40 +116,43 @@ export function DraggablePlaylistSong({
       { scale },
     ],
     opacity,
-    zIndex: isDragging && draggedIndex === index ? 1000 : 1,
+    zIndex: isDraggingThis ? 1000 : 1,
   };
 
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
-      <TouchableOpacity
-        style={styles.content}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
+      <View style={styles.content}>
         {/* Drag Handle */}
         <View style={styles.dragHandle} {...panResponder.panHandlers}>
           <GripVertical size={16} color="#666" />
         </View>
 
-        {/* Song Info */}
-        <Image
-          source={{ uri: song.coverUrl }}
-          style={styles.albumArt}
-        />
-        
-        <View style={styles.songInfo}>
-          <Text style={[styles.songName, isPlaying && styles.playingText]} numberOfLines={1}>
-            {song.name}
-          </Text>
-          <Text style={styles.artistName} numberOfLines={1}>
-            {song.artists}
-          </Text>
-        </View>
+        {/* Song Content */}
+        <TouchableOpacity
+          style={styles.songContent}
+          onPress={onPress}
+          activeOpacity={0.7}
+          disabled={isDraggingThis}
+        >
+          <Image
+            source={{ uri: song.coverUrl }}
+            style={styles.albumArt}
+          />
+          
+          <View style={styles.songInfo}>
+            <Text style={[styles.songName, isPlaying && styles.playingText]} numberOfLines={1}>
+              {song.name}
+            </Text>
+            <Text style={styles.artistName} numberOfLines={1}>
+              {song.artists}
+            </Text>
+          </View>
 
-        {/* Duration */}
-        <Text style={styles.duration}>
-          {song.duration ? formatDuration(song.duration) : '--:--'}
-        </Text>
+          {/* Duration */}
+          <Text style={styles.duration}>
+            {song.duration ? formatDuration(song.duration) : '--:--'}
+          </Text>
+        </TouchableOpacity>
 
         {/* Controls */}
         <View style={styles.controls}>
@@ -146,6 +160,7 @@ export function DraggablePlaylistSong({
             style={styles.controlButton}
             onPress={onPlayPress}
             activeOpacity={0.7}
+            disabled={isDraggingThis}
           >
             {isPlaying ? (
               <Pause size={20} color="#1DB954" fill="#1DB954" />
@@ -158,11 +173,12 @@ export function DraggablePlaylistSong({
             style={styles.controlButton}
             onPress={onRemove}
             activeOpacity={0.7}
+            disabled={isDraggingThis}
           >
             <X size={18} color="#ff6b6b" />
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }
@@ -179,12 +195,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+    minHeight: 80,
   },
   dragHandle: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  songContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   albumArt: {
     width: 48,
