@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
-import { Chrome as Home, Download, ListMusic, User } from 'lucide-react-native';
+import { Chrome as Home, Download, Bell, ListMusic, User } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -39,6 +39,15 @@ export default function TabLayout() {
           title: 'Downloads',
           tabBarIcon: ({ size, color }) => (
             <Download size={size} color={color} strokeWidth={2} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ size, color }) => (
+            <Bell size={size} color={color} strokeWidth={2} />
           ),
         }}
       />
