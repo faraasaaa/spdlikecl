@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -34,19 +34,24 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isShuffled, setIsShuffled] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
-  const [slideAnim] = useState(new Animated.Value(height));
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState(0);
 
+  // Memoize the slide animation to prevent recreation
+  const slideAnim = useMemo(() => new Animated.Value(height), []);
+
+  // Stable callback for status updates
   const handleStatusUpdate = useCallback((status: PlaybackStatus) => {
     setPlaybackStatus(status);
   }, []);
 
+  // Effect for audio service listener
   useEffect(() => {
     audioService.addListener(handleStatusUpdate);
     return () => audioService.removeListener(handleStatusUpdate);
   }, [handleStatusUpdate]);
 
+  // Effect for visibility animation
   useEffect(() => {
     if (visible) {
       StatusBar.setHidden(true);
@@ -67,7 +72,8 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
     }
   }, [visible, slideAnim]);
 
-  const panResponder = PanResponder.create({
+  // Memoize pan responder to prevent recreation
+  const panResponder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, gestureState) => {
       return Math.abs(gestureState.dy) > 20 && gestureState.dy > 0;
     },
@@ -93,9 +99,10 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
         }).start();
       }
     },
-  });
+  }), [slideAnim]);
 
-  const progressPanResponder = PanResponder.create({
+  // Memoize progress pan responder
+  const progressPanResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (event) => {
@@ -115,9 +122,9 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
       setIsDragging(false);
       await audioService.seekTo(dragPosition);
     },
-  });
+  }), [playbackStatus.duration, dragPosition]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     Animated.spring(slideAnim, {
       toValue: height,
       useNativeDriver: true,
@@ -126,50 +133,50 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
     }).start(() => {
       onClose();
     });
-  };
+  }, [slideAnim, onClose]);
 
-  const handlePlayPause = async () => {
+  const handlePlayPause = useCallback(async () => {
     if (playbackStatus.isPlaying) {
       await audioService.pause();
     } else {
       await audioService.resume();
     }
-  };
+  }, [playbackStatus.isPlaying]);
 
-  const handleNext = async () => {
+  const handleNext = useCallback(async () => {
     await playbackService.playNext();
-  };
+  }, []);
 
-  const handlePrevious = async () => {
+  const handlePrevious = useCallback(async () => {
     await playbackService.playPrevious();
-  };
+  }, []);
 
-  const toggleLike = () => {
+  const toggleLike = useCallback(() => {
     setIsLiked(!isLiked);
-  };
+  }, [isLiked]);
 
-  const toggleShuffle = () => {
+  const toggleShuffle = useCallback(() => {
     const newShuffleState = playbackService.toggleShuffle();
     setIsShuffled(newShuffleState);
-  };
+  }, []);
 
-  const toggleRepeat = () => {
+  const toggleRepeat = useCallback(() => {
     const newRepeatMode = playbackService.toggleRepeat();
     setRepeatMode(newRepeatMode);
-  };
+  }, []);
 
-  const formatTime = (milliseconds: number) => {
+  const formatTime = useCallback((milliseconds: number) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  const getProgressPercentage = () => {
+  const getProgressPercentage = useCallback(() => {
     if (!playbackStatus.duration) return 0;
     const position = isDragging ? dragPosition : playbackStatus.position;
     return (position / playbackStatus.duration) * 100;
-  };
+  }, [playbackStatus.duration, playbackStatus.position, isDragging, dragPosition]);
 
   if (!visible || !playbackStatus.currentSong) {
     return null;

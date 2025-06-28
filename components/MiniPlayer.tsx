@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,62 +26,65 @@ export function MiniPlayer({ onPress }: MiniPlayerProps) {
     duration: 0,
     isLoaded: false,
   });
-  const [slideAnim] = useState(new Animated.Value(100));
   const [isLiked, setIsLiked] = useState(false);
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    const handleStatusUpdate = (status: PlaybackStatus) => {
-      setPlaybackStatus(status);
-      
-      // Animate mini player in/out
-      if (status.currentSong) {
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }).start();
-      } else {
-        Animated.spring(slideAnim, {
-          toValue: 100,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }).start();
-      }
-    };
+  // Memoize the slide animation to prevent recreation
+  const slideAnim = useMemo(() => new Animated.Value(100), []);
 
-    audioService.addListener(handleStatusUpdate);
-    return () => audioService.removeListener(handleStatusUpdate);
+  // Stable callback for status updates
+  const handleStatusUpdate = useCallback((status: PlaybackStatus) => {
+    setPlaybackStatus(status);
+    
+    // Animate mini player in/out
+    if (status.currentSong) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }).start();
+    } else {
+      Animated.spring(slideAnim, {
+        toValue: 100,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }).start();
+    }
   }, [slideAnim]);
 
-  const handlePlayPause = async (e: any) => {
+  useEffect(() => {
+    audioService.addListener(handleStatusUpdate);
+    return () => audioService.removeListener(handleStatusUpdate);
+  }, [handleStatusUpdate]);
+
+  const handlePlayPause = useCallback(async (e: any) => {
     e.stopPropagation();
     if (playbackStatus.isPlaying) {
       await audioService.pause();
     } else {
       await audioService.resume();
     }
-  };
+  }, [playbackStatus.isPlaying]);
 
-  const handleNext = async (e: any) => {
+  const handleNext = useCallback(async (e: any) => {
     e.stopPropagation();
     await playbackService.playNext();
-  };
+  }, []);
 
-  const toggleLike = (e: any) => {
+  const toggleLike = useCallback((e: any) => {
     e.stopPropagation();
     setIsLiked(!isLiked);
-  };
+  }, [isLiked]);
 
-  const getProgressPercentage = () => {
+  const getProgressPercentage = useCallback(() => {
     if (!playbackStatus.duration) return 0;
     return (playbackStatus.position / playbackStatus.duration) * 100;
-  };
+  }, [playbackStatus.position, playbackStatus.duration]);
 
-  // Create pan responder for swipe gestures
-  const panResponder = PanResponder.create({
+  // Memoize pan responder to prevent recreation
+  const panResponder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, gestureState) => {
       return Math.abs(gestureState.dy) > 20 && gestureState.dy < 0;
     },
@@ -99,7 +102,7 @@ export function MiniPlayer({ onPress }: MiniPlayerProps) {
         useNativeDriver: true,
       }).start();
     },
-  });
+  }), [slideAnim, onPress]);
 
   if (!playbackStatus.currentSong) {
     return null;
@@ -107,12 +110,15 @@ export function MiniPlayer({ onPress }: MiniPlayerProps) {
 
   const song = playbackStatus.currentSong;
 
+  // Calculate bottom position to sit exactly on top of tab bar
+  const tabBarHeight = Platform.OS === 'ios' ? 90 : 60;
+
   return (
     <Animated.View
       style={[
         styles.container,
         {
-          bottom: 0, // Position directly above tab bar
+          bottom: tabBarHeight,
           transform: [{ translateY: slideAnim }],
         },
       ]}
