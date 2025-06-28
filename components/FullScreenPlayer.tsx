@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -38,14 +38,14 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState(0);
 
-  useEffect(() => {
-    const handleStatusUpdate = (status: PlaybackStatus) => {
-      setPlaybackStatus(status);
-    };
+  const handleStatusUpdate = useCallback((status: PlaybackStatus) => {
+    setPlaybackStatus(status);
+  }, []);
 
+  useEffect(() => {
     audioService.addListener(handleStatusUpdate);
     return () => audioService.removeListener(handleStatusUpdate);
-  }, []);
+  }, [handleStatusUpdate]);
 
   useEffect(() => {
     if (visible) {

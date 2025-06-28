@@ -23,7 +23,7 @@ import { playlistService, type Playlist } from '../../../services/playlistServic
 import { playbackService } from '../../../services/playbackService';
 import { audioService, type PlaybackStatus } from '../../../services/audioService';
 import { downloadService } from '../../../services/downloadService';
-import { DraggablePlaylistSong } from '../../../components/DraggablePlaylistSong';
+import { PlaylistSong } from '../../../components/PlaylistSong';
 import { AddToPlaylistModal } from '../../../components/AddToPlaylistModal';
 import { MiniPlayer } from '../../../components/MiniPlayer';
 import { FullScreenPlayer } from '../../../components/FullScreenPlayer';
@@ -44,7 +44,6 @@ export default function PlaylistDetailScreen() {
   });
   const [showAddSongsModal, setShowAddSongsModal] = useState(false);
   const [showFullPlayer, setShowFullPlayer] = useState(false);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null);
   const { toast, showToast, hideToast } = useToast();
 
@@ -165,18 +164,28 @@ export default function PlaylistDetailScreen() {
     );
   };
 
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
-  };
-
-  const handleDragEnd = async (fromIndex: number, toIndex: number) => {
-    setDraggedIndex(null);
-    
-    if (!playlist || fromIndex === toIndex) return;
+  const handleMoveSongUp = async (index: number) => {
+    if (!playlist || index <= 0) return;
 
     const newSongs = [...playlist.songs];
-    const [movedSong] = newSongs.splice(fromIndex, 1);
-    newSongs.splice(toIndex, 0, movedSong);
+    const [movedSong] = newSongs.splice(index, 1);
+    newSongs.splice(index - 1, 0, movedSong);
+
+    const success = await playlistService.reorderPlaylistSongs(playlist.id, newSongs);
+    if (!success) {
+      showToast({
+        message: 'Failed to reorder songs',
+        type: 'error',
+      });
+    }
+  };
+
+  const handleMoveSongDown = async (index: number) => {
+    if (!playlist || index >= playlist.songs.length - 1) return;
+
+    const newSongs = [...playlist.songs];
+    const [movedSong] = newSongs.splice(index, 1);
+    newSongs.splice(index + 1, 0, movedSong);
 
     const success = await playlistService.reorderPlaylistSongs(playlist.id, newSongs);
     if (!success) {
@@ -303,18 +312,17 @@ export default function PlaylistDetailScreen() {
           ) : (
             <View style={styles.songsList}>
               {playlist.songs.map((song, index) => (
-                <DraggablePlaylistSong
+                <PlaylistSong
                   key={`${song.id}-${index}`}
                   song={song}
                   index={index}
+                  totalSongs={playlist.songs.length}
                   isPlaying={isCurrentlyPlaying(song)}
                   onPress={() => handlePlaySong(song, index)}
                   onPlayPress={() => handlePlaySong(song, index)}
                   onRemove={() => handleRemoveSong(song)}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  isDragging={draggedIndex !== null}
-                  draggedIndex={draggedIndex}
+                  onMoveUp={() => handleMoveSongUp(index)}
+                  onMoveDown={() => handleMoveSongDown(index)}
                 />
               ))}
             </View>
