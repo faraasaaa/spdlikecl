@@ -45,6 +45,7 @@ export default function PlaylistDetailScreen() {
   const [showAddSongsModal, setShowAddSongsModal] = useState(false);
   const [showFullPlayer, setShowFullPlayer] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null);
   const { toast, showToast, hideToast } = useToast();
 
   useEffect(() => {
@@ -89,14 +90,23 @@ export default function PlaylistDetailScreen() {
       return;
     }
 
-    const success = await playbackService.playPlaylist(playlist);
-    if (success) {
-      setShowFullPlayer(true);
+    // Check if this playlist is currently playing
+    if (currentPlaylistId === playlist.id && playbackStatus.isPlaying) {
+      // If same playlist is playing, pause it
+      await audioService.pause();
+      setCurrentPlaylistId(null);
     } else {
-      showToast({
-        message: 'Failed to play playlist',
-        type: 'error',
-      });
+      // Play the playlist
+      const success = await playbackService.playPlaylist(playlist);
+      if (success) {
+        setCurrentPlaylistId(playlist.id);
+        setShowFullPlayer(true);
+      } else {
+        showToast({
+          message: 'Failed to play playlist',
+          type: 'error',
+        });
+      }
     }
   };
 
@@ -114,6 +124,7 @@ export default function PlaylistDetailScreen() {
       // Different song - play from this position in playlist
       const success = await playbackService.playPlaylist(playlist, index);
       if (success) {
+        setCurrentPlaylistId(playlist.id);
         setShowFullPlayer(true);
       } else {
         showToast({
@@ -196,6 +207,10 @@ export default function PlaylistDetailScreen() {
     return playbackStatus.currentSong?.id === song.id && playbackStatus.isPlaying;
   };
 
+  const isPlaylistPlaying = () => {
+    return playlist && currentPlaylistId === playlist.id && playbackStatus.isPlaying;
+  };
+
   if (!playlist) {
     return (
       <LinearGradient colors={['#1a1a1a', '#000']} style={styles.container}>
@@ -256,7 +271,11 @@ export default function PlaylistDetailScreen() {
               disabled={playlist.songs.length === 0}
               activeOpacity={0.8}
             >
-              <Play size={24} color={playlist.songs.length === 0 ? "#666" : "#000"} fill={playlist.songs.length === 0 ? "#666" : "#000"} />
+              {isPlaylistPlaying() ? (
+                <Pause size={24} color={playlist.songs.length === 0 ? "#666" : "#000"} fill={playlist.songs.length === 0 ? "#666" : "#000"} />
+              ) : (
+                <Play size={24} color={playlist.songs.length === 0 ? "#666" : "#000"} fill={playlist.songs.length === 0 ? "#666" : "#000"} />
+              )}
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.shuffleButton} activeOpacity={0.7}>

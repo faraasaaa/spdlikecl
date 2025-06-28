@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { Plus, Music } from 'lucide-react-native';
 import { playlistService, type Playlist } from '../../services/playlistService';
 import { playbackService } from '../../services/playbackService';
+import { audioService, type PlaybackStatus } from '../../services/audioService';
 import { PlaylistCard } from '../../components/PlaylistCard';
 import { CreatePlaylistModal } from '../../components/CreatePlaylistModal';
 import { MiniPlayer } from '../../components/MiniPlayer';
@@ -25,6 +26,14 @@ export default function PlaylistsScreen() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFullPlayer, setShowFullPlayer] = useState(false);
+  const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>({
+    isPlaying: false,
+    currentSong: null,
+    position: 0,
+    duration: 0,
+    isLoaded: false,
+  });
+  const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null);
   const { toast, showToast, hideToast } = useToast();
 
   useEffect(() => {
@@ -34,8 +43,17 @@ export default function PlaylistsScreen() {
       loadPlaylists();
     };
 
+    const handleStatusUpdate = (status: PlaybackStatus) => {
+      setPlaybackStatus(status);
+    };
+
     playlistService.addListener(handlePlaylistChange);
-    return () => playlistService.removeListener(handlePlaylistChange);
+    audioService.addListener(handleStatusUpdate);
+    
+    return () => {
+      playlistService.removeListener(handlePlaylistChange);
+      audioService.removeListener(handleStatusUpdate);
+    };
   }, []);
 
   const loadPlaylists = () => {
@@ -56,14 +74,23 @@ export default function PlaylistsScreen() {
       return;
     }
 
-    const success = await playbackService.playPlaylist(playlist);
-    if (success) {
-      setShowFullPlayer(true);
+    // Check if this playlist is currently playing
+    if (currentPlaylistId === playlist.id && playbackStatus.isPlaying) {
+      // If same playlist is playing, pause it
+      await audioService.pause();
+      setCurrentPlaylistId(null);
     } else {
-      showToast({
-        message: 'Failed to play playlist',
-        type: 'error',
-      });
+      // Play the playlist
+      const success = await playbackService.playPlaylist(playlist);
+      if (success) {
+        setCurrentPlaylistId(playlist.id);
+        setShowFullPlayer(true);
+      } else {
+        showToast({
+          message: 'Failed to play playlist',
+          type: 'error',
+        });
+      }
     }
   };
 
@@ -77,6 +104,12 @@ export default function PlaylistsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            // Stop playback if this playlist is currently playing
+            if (currentPlaylistId === playlist.id) {
+              await audioService.stop();
+              setCurrentPlaylistId(null);
+            }
+            
             const success = await playlistService.deletePlaylist(playlist.id);
             if (success) {
               showToast({
@@ -100,6 +133,10 @@ export default function PlaylistsScreen() {
       message: 'Playlist created successfully',
       type: 'success',
     });
+  };
+
+  const isPlaylistPlaying = (playlist: Playlist) => {
+    return currentPlaylistId === playlist.id && playbackStatus.isPlaying;
   };
 
   return (
@@ -141,6 +178,7 @@ export default function PlaylistsScreen() {
                 onPress={() => handleOpenPlaylist(playlist)}
                 onPlayPress={() => handlePlayPlaylist(playlist)}
                 onMorePress={() => handleDeletePlaylist(playlist)}
+                isPlaying={isPlaylistPlaying(playlist)}
               />
             ))}
             <View style={styles.bottomPadding} />

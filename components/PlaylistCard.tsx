@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Play, MoveHorizontal as MoreHorizontal } from 'lucide-react-native';
+import { Play, Pause, MoveHorizontal as MoreHorizontal } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { audioService } from '../services/audioService';
 import type { Playlist } from '../services/playlistService';
 
 interface PlaylistCardProps {
@@ -10,6 +11,7 @@ interface PlaylistCardProps {
   onPlayPress?: () => void;
   onMorePress?: () => void;
   size?: 'small' | 'large';
+  isPlaying?: boolean;
 }
 
 export function PlaylistCard({ 
@@ -17,7 +19,8 @@ export function PlaylistCard({
   onPress, 
   onPlayPress, 
   onMorePress,
-  size = 'large' 
+  size = 'large',
+  isPlaying = false
 }: PlaylistCardProps) {
   const router = useRouter();
   const isSmall = size === 'small';
@@ -28,6 +31,18 @@ export function PlaylistCard({
     } else {
       // Navigate to playlist detail screen
       router.push(`/(tabs)/playlist/${playlist.id}`);
+    }
+  };
+
+  const handlePlayPress = async (e: any) => {
+    e.stopPropagation();
+    
+    if (isPlaying) {
+      // If playlist is playing, pause it
+      await audioService.pause();
+    } else {
+      // If playlist is not playing, play it
+      onPlayPress?.();
     }
   };
 
@@ -60,13 +75,14 @@ export function PlaylistCard({
         {playlist.songs.length > 0 && (
           <TouchableOpacity
             style={styles.playButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              onPlayPress?.();
-            }}
+            onPress={handlePlayPress}
             activeOpacity={0.8}
           >
-            <Play size={isSmall ? 16 : 20} color="#000" fill="#000" />
+            {isPlaying ? (
+              <Pause size={isSmall ? 16 : 20} color="#000" fill="#000" />
+            ) : (
+              <Play size={isSmall ? 16 : 20} color="#000" fill="#000" />
+            )}
           </TouchableOpacity>
         )}
       </View>

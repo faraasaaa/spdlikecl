@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Plus, Check, Music } from 'lucide-react-native';
 import { playlistService, type Playlist } from '../services/playlistService';
+import { downloadService } from '../services/downloadService';
 import type { DownloadedSong } from '../services/downloadService';
 
 interface AddToPlaylistModalProps {
@@ -24,11 +25,13 @@ interface AddToPlaylistModalProps {
 export function AddToPlaylistModal({ visible, song, onClose, onCreatePlaylist }: AddToPlaylistModalProps) {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playlistsContainingSong, setPlaylistsContainingSong] = useState<Set<string>>(new Set());
+  const [downloadedSongs, setDownloadedSongs] = useState<DownloadedSong[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (visible && song) {
+    if (visible) {
       loadPlaylists();
+      loadDownloadedSongs();
     }
   }, [visible, song]);
 
@@ -42,14 +45,20 @@ export function AddToPlaylistModal({ visible, song, onClose, onCreatePlaylist }:
     }
   };
 
-  const handleAddToPlaylist = async (playlist: Playlist) => {
-    if (!song) return;
+  const loadDownloadedSongs = () => {
+    const songs = downloadService.getAllDownloadedSongs();
+    setDownloadedSongs(songs);
+  };
 
+  const handleAddToPlaylist = async (playlist: Playlist, songToAdd: DownloadedSong) => {
     setLoading(true);
     try {
-      const success = await playlistService.addSongToPlaylist(playlist.id, song);
+      const success = await playlistService.addSongToPlaylist(playlist.id, songToAdd);
       if (success) {
-        setPlaylistsContainingSong(prev => new Set([...prev, playlist.id]));
+        if (song) {
+          // If adding a specific song, update the containing playlists
+          setPlaylistsContainingSong(prev => new Set([...prev, playlist.id]));
+        }
         Alert.alert('Success', `Added to "${playlist.name}"`);
       } else {
         Alert.alert('Info', 'Song is already in this playlist');
@@ -61,18 +70,19 @@ export function AddToPlaylistModal({ visible, song, onClose, onCreatePlaylist }:
     }
   };
 
-  const handleRemoveFromPlaylist = async (playlist: Playlist) => {
-    if (!song) return;
-
+  const handleRemoveFromPlaylist = async (playlist: Playlist, songToRemove: DownloadedSong) => {
     setLoading(true);
     try {
-      const success = await playlistService.removeSongFromPlaylist(playlist.id, song.id);
+      const success = await playlistService.removeSongFromPlaylist(playlist.id, songToRemove.id);
       if (success) {
-        setPlaylistsContainingSong(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(playlist.id);
-          return newSet;
-        });
+        if (song) {
+          // If removing a specific song, update the containing playlists
+          setPlaylistsContainingSong(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(playlist.id);
+            return newSet;
+          });
+        }
         Alert.alert('Success', `Removed from "${playlist.name}"`);
       }
     } catch (error) {
@@ -83,30 +93,73 @@ export function AddToPlaylistModal({ visible, song, onClose, onCreatePlaylist }:
   };
 
   const renderPlaylistItem = (playlist: Playlist) => {
-    const isInPlaylist = playlistsContainingSong.has(playlist.id);
+    if (song) {
+      // If a specific song is selected, show add/remove for that song
+      const isInPlaylist = playlistsContainingSong.has(playlist.id);
 
-    return (
-      <TouchableOpacity
-        key={playlist.id}
-        style={styles.playlistItem}
-        onPress={() => isInPlaylist ? handleRemoveFromPlaylist(playlist) : handleAddToPlaylist(playlist)}
-        disabled={loading}
-        activeOpacity={0.7}
-      >
-        <View style={styles.playlistInfo}>
-          <Text style={styles.playlistName} numberOfLines={1}>
-            {playlist.name}
-          </Text>
-          <Text style={styles.playlistStats}>
+      return (
+        <TouchableOpacity
+          key={playlist.id}
+          style={styles.playlistItem}
+          onPress={() => isInPlaylist ? handleRemoveFromPlaylist(playlist, song) : handleAddToPlaylist(playlist, song)}
+          disabled={loading}
+          activeOpacity={0.7}
+        >
+          <View style={styles.playlistInfo}>
+            <Text style={styles.playlistName} numberOfLines={1}>
+              {playlist.name}
+            </Text>
+            <Text style={styles.playlistStats}>
+              {playlist.songs.length} song{playlist.songs.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+          
+          <View style={[styles.checkButton, isInPlaylist && styles.checkButtonActive]}>
+            {isInPlaylist && <Check size={16} color="#fff" />}
+          </View>
+        </TouchableOpacity>
+      );
+    } else {
+      // If no specific song, show the playlist for browsing downloaded songs
+      return (
+        <View key={playlist.id} style={styles.playlistSection}>
+          <Text style={styles.playlistSectionTitle}>{playlist.name}</Text>
+          <Text style={styles.playlistSectionSubtitle}>
             {playlist.songs.length} song{playlist.songs.length !== 1 ? 's' : ''}
           </Text>
+          
+          {downloadedSongs.length === 0 ? (
+            <Text style={styles.noSongsText}>No downloaded songs available</Text>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.songsScroll}>
+              {downloadedSongs.map((downloadedSong) => {
+                const isInPlaylist = playlist.songs.some(s => s.id === downloadedSong.id);
+                
+                return (
+                  <TouchableOpacity
+                    key={downloadedSong.id}
+                    style={[styles.songItem, isInPlaylist && styles.songItemInPlaylist]}
+                    onPress={() => isInPlaylist ? handleRemoveFromPlaylist(playlist, downloadedSong) : handleAddToPlaylist(playlist, downloadedSong)}
+                    disabled={loading}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.songName} numberOfLines={1}>
+                      {downloadedSong.name}
+                    </Text>
+                    <Text style={styles.songArtist} numberOfLines={1}>
+                      {downloadedSong.artists}
+                    </Text>
+                    <View style={[styles.songCheckButton, isInPlaylist && styles.songCheckButtonActive]}>
+                      {isInPlaylist && <Check size={12} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
         </View>
-        
-        <View style={[styles.checkButton, isInPlaylist && styles.checkButtonActive]}>
-          {isInPlaylist && <Check size={16} color="#fff" />}
-        </View>
-      </TouchableOpacity>
-    );
+      );
+    }
   };
 
   return (
@@ -123,7 +176,9 @@ export function AddToPlaylistModal({ visible, song, onClose, onCreatePlaylist }:
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <X size={24} color="#fff" />
             </TouchableOpacity>
-            <Text style={styles.title}>Add to Playlist</Text>
+            <Text style={styles.title}>
+              {song ? 'Add to Playlist' : 'Manage Playlists'}
+            </Text>
             <View style={styles.placeholder} />
           </View>
 
@@ -278,6 +333,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkButtonActive: {
+    backgroundColor: '#1DB954',
+    borderColor: '#1DB954',
+  },
+  playlistSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
+  },
+  playlistSectionTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    marginBottom: 4,
+  },
+  playlistSectionSubtitle: {
+    color: '#888',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 12,
+  },
+  noSongsText: {
+    color: '#666',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    fontStyle: 'italic',
+  },
+  songsScroll: {
+    marginTop: 8,
+  },
+  songItem: {
+    width: 120,
+    padding: 8,
+    marginRight: 8,
+    backgroundColor: '#333',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  songItemInPlaylist: {
+    backgroundColor: 'rgba(29, 185, 84, 0.1)',
+    borderColor: '#1DB954',
+  },
+  songCheckButton: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#666',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    marginTop: 4,
+  },
+  songCheckButtonActive: {
     backgroundColor: '#1DB954',
     borderColor: '#1DB954',
   },
