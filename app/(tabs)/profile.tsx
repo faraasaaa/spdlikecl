@@ -234,8 +234,6 @@ export default function ProfileScreen() {
             <Text style={styles.version}>Version 1.0.0</Text>
             <Text style={styles.madeWith}>Made with ❤️ using Expo</Text>
           </View>
-
-          <View style={styles.bottomPadding} />
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -322,9 +320,6 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 11,
     fontFamily: 'Inter-Regular',
-  },
-  bottomPadding: {
-    height: 160, // Extra space for mini player
   },
   sectionHeader: {
     paddingHorizontal: 16,

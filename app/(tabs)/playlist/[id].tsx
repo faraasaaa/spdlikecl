@@ -25,7 +25,6 @@ import { audioService, type PlaybackStatus } from '../../../services/audioServic
 import { downloadService } from '../../../services/downloadService';
 import { PlaylistSong } from '../../../components/PlaylistSong';
 import { AddToPlaylistModal } from '../../../components/AddToPlaylistModal';
-import { MiniPlayer } from '../../../components/MiniPlayer';
 import { FullScreenPlayer } from '../../../components/FullScreenPlayer';
 import { Toast } from '../../../components/Toast';
 import { useToast } from '../../../hooks/useToast';
@@ -327,11 +326,7 @@ export default function PlaylistDetailScreen() {
               ))}
             </View>
           )}
-
-          <View style={styles.bottomPadding} />
         </ScrollView>
-
-        <MiniPlayer onPress={() => setShowFullPlayer(true)} />
         
         <FullScreenPlayer 
           visible={showFullPlayer} 
@@ -363,7 +358,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingBottom: 70, // Space for mini player + tab bar
   },
   header: {
     flexDirection: 'row',
@@ -515,8 +509,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
     lineHeight: 20,
-  },
-  bottomPadding: {
-    height: 20,
   },
 });

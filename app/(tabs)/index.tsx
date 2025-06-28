@@ -11,7 +11,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchBar } from '../../components/SearchBar';
 import { TrackCard } from '../../components/TrackCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { MiniPlayer } from '../../components/MiniPlayer';
 import { FullScreenPlayer } from '../../components/FullScreenPlayer';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
@@ -194,8 +193,6 @@ export default function HomeScreen() {
             ))}
           </View>
         )}
-
-        <View style={styles.bottomPadding} />
       </ScrollView>
     );
   };
@@ -219,8 +216,6 @@ export default function HomeScreen() {
         {hasSearched && renderTabs()}
         
         {renderSearchResults()}
-
-        <MiniPlayer onPress={() => setShowFullPlayer(true)} />
         
         <FullScreenPlayer 
           visible={showFullPlayer} 
@@ -246,7 +241,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingBottom: 70, // Space for mini player + tab bar
   },
   header: {
     paddingHorizontal: 16,
@@ -410,8 +404,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
-  },
-  bottomPadding: {
-    height: 20,
   },
 });

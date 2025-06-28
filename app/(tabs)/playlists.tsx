@@ -16,7 +16,6 @@ import { playbackService } from '../../services/playbackService';
 import { audioService, type PlaybackStatus } from '../../services/audioService';
 import { PlaylistCard } from '../../components/PlaylistCard';
 import { CreatePlaylistModal } from '../../components/CreatePlaylistModal';
-import { MiniPlayer } from '../../components/MiniPlayer';
 import { FullScreenPlayer } from '../../components/FullScreenPlayer';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
@@ -181,11 +180,8 @@ export default function PlaylistsScreen() {
                 isPlaying={isPlaylistPlaying(playlist)}
               />
             ))}
-            <View style={styles.bottomPadding} />
           </ScrollView>
         )}
-
-        <MiniPlayer onPress={() => setShowFullPlayer(true)} />
         
         <FullScreenPlayer 
           visible={showFullPlayer} 
@@ -217,7 +213,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingBottom: 70, // Space for mini player + tab bar
   },
   header: {
     flexDirection: 'row',
@@ -278,8 +273,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     marginLeft: 8,
-  },
-  bottomPadding: {
-    height: 20,
   },
 });

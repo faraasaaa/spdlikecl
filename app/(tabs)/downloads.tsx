@@ -14,7 +14,6 @@ import { Trash2, Play, Music, Pause } from 'lucide-react-native';
 import { downloadService, type DownloadedSong } from '../../services/downloadService';
 import { audioService, type PlaybackStatus } from '../../services/audioService';
 import { playbackService } from '../../services/playbackService';
-import { MiniPlayer } from '../../components/MiniPlayer';
 import { FullScreenPlayer } from '../../components/FullScreenPlayer';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
@@ -221,17 +220,11 @@ export default function DownloadsScreen() {
               </Text>
             </View>
 
-            <ScrollView 
-              style={styles.scrollView} 
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-            >
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
               {downloadedSongs.map(renderSongItem)}
             </ScrollView>
           </>
         )}
-
-        <MiniPlayer onPress={() => setShowFullPlayer(true)} />
         
         <FullScreenPlayer 
           visible={showFullPlayer} 
@@ -313,9 +306,6 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 160, // Space for mini player + tab bar
   },
   songItem: {
     flexDirection: 'row',
