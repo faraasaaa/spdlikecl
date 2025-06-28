@@ -32,6 +32,7 @@ class DownloadService {
   private downloadedSongs: Map<string, DownloadedSong> = new Map();
   private listeners: Set<() => void> = new Set();
   private baseUrl = 'https://conventional-malena-noneoool-355b1774.koyeb.app';
+  private currentlyDownloading: Set<string> = new Set(); // Track songs being downloaded
 
   constructor() {
     this.loadDownloadedSongs();
@@ -85,9 +86,31 @@ class DownloadService {
         };
       }
 
+      // Check if currently downloading
+      if (this.currentlyDownloading.has(trackId)) {
+        return {
+          success: false,
+          message: 'Song is already being downloaded'
+        };
+      }
+
+      // Check if any other song is currently downloading
+      if (this.currentlyDownloading.size > 0) {
+        return {
+          success: false,
+          message: 'Another song is currently downloading. Please wait for it to complete.'
+        };
+      }
+
+      // Mark as downloading
+      this.currentlyDownloading.add(trackId);
+      this.notifyListeners();
+
       // Get detailed track info from Spotify API
       const spotifyTrack = await spotifyApi.getTrack(trackId);
       if (!spotifyTrack) {
+        this.currentlyDownloading.delete(trackId);
+        this.notifyListeners();
         return {
           success: false,
           message: 'Failed to get track details from Spotify'
@@ -100,6 +123,8 @@ class DownloadService {
       // Get download URL from the new API
       const downloadData = await this.getDownloadUrlFromNewAPI(spotifyUrl);
       if (!downloadData || downloadData.status !== 'success') {
+        this.currentlyDownloading.delete(trackId);
+        this.notifyListeners();
         return {
           success: false,
           message: 'Failed to get download URL'
@@ -131,6 +156,8 @@ class DownloadService {
         );
 
         if (!downloadedPath) {
+          this.currentlyDownloading.delete(trackId);
+          this.notifyListeners();
           return {
             success: false,
             message: 'Failed to download file'
@@ -159,6 +186,10 @@ class DownloadService {
       this.downloadedSongs.set(trackId, song);
       await this.saveDownloadedSongs();
 
+      // Remove from downloading set
+      this.currentlyDownloading.delete(trackId);
+      this.notifyListeners();
+
       return {
         success: true,
         message: 'Song downloaded successfully',
@@ -166,6 +197,9 @@ class DownloadService {
       };
     } catch (error) {
       console.error('Error downloading song:', error);
+      // Make sure to remove from downloading set on error
+      this.currentlyDownloading.delete(trackId);
+      this.notifyListeners();
       return {
         success: false,
         message: 'Download failed: ' + (error as Error).message
@@ -273,6 +307,10 @@ class DownloadService {
     return this.downloadedSongs.has(trackId);
   }
 
+  isDownloading(trackId: string): boolean {
+    return this.currentlyDownloading.has(trackId);
+  }
+
   getDownloadedSong(trackId: string): DownloadedSong | undefined {
     return this.downloadedSongs.get(trackId);
   }
@@ -327,7 +365,7 @@ class DownloadService {
 
       // Clear memory and storage
       this.downloadedSongs.clear();
-      await this.cache.remove('downloaded_songs');
+      await storageService.removeData('downloaded_songs');
       this.notifyListeners();
 
       return true;

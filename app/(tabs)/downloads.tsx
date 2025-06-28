@@ -120,6 +120,19 @@ export default function DownloadsScreen() {
     }
   };
 
+  const handleSongNamePress = async (song: DownloadedSong) => {
+    // When song name is clicked, play the song and open full screen player
+    const success = await playbackService.playSong(song);
+    if (success) {
+      setShowFullPlayer(true);
+    } else {
+      showToast({
+        message: 'Unable to play this song. The file may be corrupted or in an unsupported format.',
+        type: 'error',
+      });
+    }
+  };
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString();
   };
@@ -142,7 +155,11 @@ export default function DownloadsScreen() {
         style={styles.albumArt}
       />
       
-      <View style={styles.songInfo}>
+      <TouchableOpacity 
+        style={styles.songInfo}
+        onPress={() => handleSongNamePress(song)}
+        activeOpacity={0.7}
+      >
         <Text style={[
           styles.songName,
           isCurrentSong(song) && styles.currentSongText
@@ -158,7 +175,7 @@ export default function DownloadsScreen() {
         <Text style={styles.downloadDate}>
           Downloaded {formatDate(song.downloadedAt)}
         </Text>
-      </View>
+      </TouchableOpacity>
 
       <View style={styles.actions}>
         <TouchableOpacity

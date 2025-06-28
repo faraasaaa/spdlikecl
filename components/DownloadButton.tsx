@@ -25,12 +25,14 @@ export function DownloadButton({
     // Listen for download state changes
     const handleDownloadChange = () => {
       setIsDownloaded(downloadService.isDownloaded(trackId));
+      setIsDownloading(downloadService.isDownloading(trackId));
     };
 
     downloadService.addListener(handleDownloadChange);
     
     // Initial check
     setIsDownloaded(downloadService.isDownloaded(trackId));
+    setIsDownloading(downloadService.isDownloading(trackId));
 
     return () => {
       downloadService.removeListener(handleDownloadChange);
