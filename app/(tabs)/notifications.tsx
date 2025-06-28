@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, RefreshCw, AlertCircle, Calendar, User as UserIcon } from 'lucide-react-native';
+import { Bell, RefreshCw, CircleAlert as AlertCircle, Calendar, User as UserIcon } from 'lucide-react-native';
 import { notificationService, type Notification } from '../../services/notificationService';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
