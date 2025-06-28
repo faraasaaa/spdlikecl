@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trash2, Play, Music, Pause } from 'lucide-react-native';
 import { downloadService, type DownloadedSong } from '../../services/downloadService';
 import { audioService, type PlaybackStatus } from '../../services/audioService';
@@ -30,6 +31,7 @@ export default function DownloadsScreen() {
     isLoaded: false,
   });
   const { toast, showToast, hideToast } = useToast();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadDownloadedSongs();
@@ -220,7 +222,11 @@ export default function DownloadsScreen() {
               </Text>
             </View>
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.scrollView} 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: Math.max(100, insets.bottom + 80) }}
+            >
               {downloadedSongs.map(renderSongItem)}
             </ScrollView>
           </>

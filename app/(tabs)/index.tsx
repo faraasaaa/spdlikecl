@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SearchBar } from '../../components/SearchBar';
 import { TrackCard } from '../../components/TrackCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -28,6 +29,7 @@ export default function HomeScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const [showFullPlayer, setShowFullPlayer] = useState(false);
   const { toast, showToast, hideToast } = useToast();
+  const insets = useSafeAreaInsets();
 
   const searchDelayRef = useRef<NodeJS.Timeout>();
 
@@ -158,7 +160,11 @@ export default function HomeScreen() {
     }
 
     return (
-      <ScrollView style={styles.resultsContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.resultsContainer} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: Math.max(100, insets.bottom + 80) }}
+      >
         {(activeTab === 'all' || activeTab === 'tracks') && tracks.length > 0 && (
           <View style={styles.resultSection}>
             {activeTab === 'all' && <Text style={styles.sectionTitle}>Songs</Text>}

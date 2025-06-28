@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Settings,
@@ -40,6 +41,7 @@ export default function ProfileScreen() {
   const [storageInfo, setStorageInfo] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadStorageInfo();
@@ -267,6 +269,7 @@ export default function ProfileScreen() {
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: Math.max(100, insets.bottom + 80) }}
         >
           <View style={styles.header}>
             <View style={styles.avatarContainer}>

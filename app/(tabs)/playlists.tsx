@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Plus, Music } from 'lucide-react-native';
 import { playlistService, type Playlist } from '../../services/playlistService';
@@ -34,6 +35,7 @@ export default function PlaylistsScreen() {
   });
   const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null);
   const { toast, showToast, hideToast } = useToast();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadPlaylists();
@@ -169,7 +171,11 @@ export default function PlaylistsScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.scrollView} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: Math.max(100, insets.bottom + 80) }}
+          >
             {playlists.map((playlist) => (
               <PlaylistCard
                 key={playlist.id}

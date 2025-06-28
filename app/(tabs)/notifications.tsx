@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, RefreshCw, CircleAlert as AlertCircle, Calendar, User as UserIcon } from 'lucide-react-native';
 import { notificationService, type Notification } from '../../services/notificationService';
 import { Toast } from '../../components/Toast';
@@ -22,6 +23,7 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast, showToast, hideToast } = useToast();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadNotifications();
@@ -198,6 +200,7 @@ export default function NotificationsScreen() {
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: Math.max(100, insets.bottom + 80) }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

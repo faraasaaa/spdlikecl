@@ -1,8 +1,20 @@
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chrome as Home, Download, Bell, ListMusic, User } from 'lucide-react-native';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  
+  // Calculate bottom padding for Android devices with navigation bars
+  const getTabBarHeight = () => {
+    if (Platform.OS === 'android') {
+      // Add extra padding for Android devices with navigation bars
+      return Math.max(60, 60 + insets.bottom);
+    }
+    return Platform.OS === 'ios' ? 90 : 60;
+  };
+
   return (
     <Tabs
       screenOptions={{
@@ -12,8 +24,12 @@ export default function TabLayout() {
           borderTopColor: '#1a1a1a',
           borderTopWidth: 1,
           paddingTop: 8,
-          paddingBottom: Platform.OS === 'ios' ? 34 : 8,
-          height: Platform.OS === 'ios' ? 90 : 60,
+          paddingBottom: Platform.OS === 'ios' ? 34 : Math.max(8, insets.bottom + 8),
+          height: getTabBarHeight(),
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
         },
         tabBarActiveTintColor: '#1DB954',
         tabBarInactiveTintColor: '#888',

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { 
   ArrowLeft, 
@@ -45,6 +46,7 @@ export default function PlaylistDetailScreen() {
   const [showFullPlayer, setShowFullPlayer] = useState(false);
   const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null);
   const { toast, showToast, hideToast } = useToast();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (id) {
@@ -252,7 +254,11 @@ export default function PlaylistDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: Math.max(100, insets.bottom + 80) }}
+        >
           {/* Playlist Info */}
           <View style={styles.playlistInfo}>
             <Image
