@@ -7,10 +7,11 @@ import {
   Modal,
   ScrollView,
   Alert,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Plus, Check, Music } from 'lucide-react-native';
+import { X, Plus, Check, Music, ChevronUp, ChevronDown } from 'lucide-react-native';
 import { playlistService, type Playlist } from '../services/playlistService';
 import { downloadService } from '../services/downloadService';
 import type { DownloadedSong } from '../services/downloadService';
@@ -18,22 +19,32 @@ import type { DownloadedSong } from '../services/downloadService';
 interface AddToPlaylistModalProps {
   visible: boolean;
   song: DownloadedSong | null;
+  playlistId?: string; // If provided, we're in "Add Songs" mode for this playlist
   onClose: () => void;
   onCreatePlaylist?: () => void;
 }
 
-export function AddToPlaylistModal({ visible, song, onClose, onCreatePlaylist }: AddToPlaylistModalProps) {
+export function AddToPlaylistModal({ visible, song, playlistId, onClose, onCreatePlaylist }: AddToPlaylistModalProps) {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playlistsContainingSong, setPlaylistsContainingSong] = useState<Set<string>>(new Set());
-  const [downloadedSongs, setDownloadedSongs] = useState<DownloadedSong[]>([]);
+  const [currentPlaylist, setCurrentPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Determine if we're in "Add Songs" mode (showing songs from a specific playlist)
+  const isAddSongsMode = !!playlistId;
 
   useEffect(() => {
     if (visible) {
-      loadPlaylists();
-      loadDownloadedSongs();
+      if (isAddSongsMode && playlistId) {
+        // Load the specific playlist for "Add Songs" mode
+        const playlist = playlistService.getPlaylist(playlistId);
+        setCurrentPlaylist(playlist || null);
+      } else {
+        // Load all playlists for regular mode
+        loadPlaylists();
+      }
     }
-  }, [visible, song]);
+  }, [visible, song, playlistId, isAddSongsMode]);
 
   const loadPlaylists = () => {
     const allPlaylists = playlistService.getAllPlaylists();
@@ -45,19 +56,18 @@ export function AddToPlaylistModal({ visible, song, onClose, onCreatePlaylist }:
     }
   };
 
-  const loadDownloadedSongs = () => {
-    const songs = downloadService.getAllDownloadedSongs();
-    setDownloadedSongs(songs);
-  };
-
   const handleAddToPlaylist = async (playlist: Playlist, songToAdd: DownloadedSong) => {
     setLoading(true);
     try {
       const success = await playlistService.addSongToPlaylist(playlist.id, songToAdd);
       if (success) {
         if (song) {
-          // If adding a specific song, update the containing playlists
           setPlaylistsContainingSong(prev => new Set([...prev, playlist.id]));
+        }
+        if (isAddSongsMode && playlistId) {
+          // Reload the current playlist to show updated songs
+          const updatedPlaylist = playlistService.getPlaylist(playlistId);
+          setCurrentPlaylist(updatedPlaylist || null);
         }
         Alert.alert('Success', `Added to "${playlist.name}"`);
       } else {
@@ -76,12 +86,16 @@ export function AddToPlaylistModal({ visible, song, onClose, onCreatePlaylist }:
       const success = await playlistService.removeSongFromPlaylist(playlist.id, songToRemove.id);
       if (success) {
         if (song) {
-          // If removing a specific song, update the containing playlists
           setPlaylistsContainingSong(prev => {
             const newSet = new Set(prev);
             newSet.delete(playlist.id);
             return newSet;
           });
+        }
+        if (isAddSongsMode && playlistId) {
+          // Reload the current playlist to show updated songs
+          const updatedPlaylist = playlistService.getPlaylist(playlistId);
+          setCurrentPlaylist(updatedPlaylist || null);
         }
         Alert.alert('Success', `Removed from "${playlist.name}"`);
       }
@@ -92,74 +106,186 @@ export function AddToPlaylistModal({ visible, song, onClose, onCreatePlaylist }:
     }
   };
 
-  const renderPlaylistItem = (playlist: Playlist) => {
-    if (song) {
-      // If a specific song is selected, show add/remove for that song
-      const isInPlaylist = playlistsContainingSong.has(playlist.id);
+  const handleMoveSongUp = async (index: number) => {
+    if (!currentPlaylist || index <= 0) return;
 
-      return (
-        <TouchableOpacity
-          key={playlist.id}
-          style={styles.playlistItem}
-          onPress={() => isInPlaylist ? handleRemoveFromPlaylist(playlist, song) : handleAddToPlaylist(playlist, song)}
-          disabled={loading}
-          activeOpacity={0.7}
-        >
-          <View style={styles.playlistInfo}>
-            <Text style={styles.playlistName} numberOfLines={1}>
-              {playlist.name}
-            </Text>
-            <Text style={styles.playlistStats}>
-              {playlist.songs.length} song{playlist.songs.length !== 1 ? 's' : ''}
-            </Text>
-          </View>
-          
-          <View style={[styles.checkButton, isInPlaylist && styles.checkButtonActive]}>
-            {isInPlaylist && <Check size={16} color="#fff" />}
-          </View>
-        </TouchableOpacity>
-      );
+    const newSongs = [...currentPlaylist.songs];
+    const [movedSong] = newSongs.splice(index, 1);
+    newSongs.splice(index - 1, 0, movedSong);
+
+    const success = await playlistService.reorderPlaylistSongs(currentPlaylist.id, newSongs);
+    if (success) {
+      // Reload the playlist to show the new order
+      const updatedPlaylist = playlistService.getPlaylist(currentPlaylist.id);
+      setCurrentPlaylist(updatedPlaylist || null);
     } else {
-      // If no specific song, show the playlist for browsing downloaded songs
-      return (
-        <View key={playlist.id} style={styles.playlistSection}>
-          <Text style={styles.playlistSectionTitle}>{playlist.name}</Text>
-          <Text style={styles.playlistSectionSubtitle}>
+      Alert.alert('Error', 'Failed to reorder songs');
+    }
+  };
+
+  const handleMoveSongDown = async (index: number) => {
+    if (!currentPlaylist || index >= currentPlaylist.songs.length - 1) return;
+
+    const newSongs = [...currentPlaylist.songs];
+    const [movedSong] = newSongs.splice(index, 1);
+    newSongs.splice(index + 1, 0, movedSong);
+
+    const success = await playlistService.reorderPlaylistSongs(currentPlaylist.id, newSongs);
+    if (success) {
+      // Reload the playlist to show the new order
+      const updatedPlaylist = playlistService.getPlaylist(currentPlaylist.id);
+      setCurrentPlaylist(updatedPlaylist || null);
+    } else {
+      Alert.alert('Error', 'Failed to reorder songs');
+    }
+  };
+
+  const renderPlaylistItem = (playlist: Playlist) => {
+    const isInPlaylist = playlistsContainingSong.has(playlist.id);
+
+    return (
+      <TouchableOpacity
+        key={playlist.id}
+        style={styles.playlistItem}
+        onPress={() => isInPlaylist ? handleRemoveFromPlaylist(playlist, song!) : handleAddToPlaylist(playlist, song!)}
+        disabled={loading}
+        activeOpacity={0.7}
+      >
+        <View style={styles.playlistInfo}>
+          <Text style={styles.playlistName} numberOfLines={1}>
+            {playlist.name}
+          </Text>
+          <Text style={styles.playlistStats}>
             {playlist.songs.length} song{playlist.songs.length !== 1 ? 's' : ''}
           </Text>
+        </View>
+        
+        <View style={[styles.checkButton, isInPlaylist && styles.checkButtonActive]}>
+          {isInPlaylist && <Check size={16} color="#fff" />}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderPlaylistSong = (song: DownloadedSong, index: number) => {
+    const canMoveUp = index > 0;
+    const canMoveDown = currentPlaylist && index < currentPlaylist.songs.length - 1;
+
+    const formatDuration = (ms: number) => {
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    return (
+      <View key={`${song.id}-${index}`} style={styles.songItem}>
+        <View style={styles.songContent}>
+          <Image
+            source={{ uri: song.coverUrl }}
+            style={styles.songAlbumArt}
+          />
           
-          {downloadedSongs.length === 0 ? (
-            <Text style={styles.noSongsText}>No downloaded songs available</Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.songsScroll}>
-              {downloadedSongs.map((downloadedSong) => {
-                const isInPlaylist = playlist.songs.some(s => s.id === downloadedSong.id);
-                
-                return (
-                  <TouchableOpacity
-                    key={downloadedSong.id}
-                    style={[styles.songItem, isInPlaylist && styles.songItemInPlaylist]}
-                    onPress={() => isInPlaylist ? handleRemoveFromPlaylist(playlist, downloadedSong) : handleAddToPlaylist(playlist, downloadedSong)}
-                    disabled={loading}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.songName} numberOfLines={1}>
-                      {downloadedSong.name}
-                    </Text>
-                    <Text style={styles.songArtist} numberOfLines={1}>
-                      {downloadedSong.artists}
-                    </Text>
-                    <View style={[styles.songCheckButton, isInPlaylist && styles.songCheckButtonActive]}>
-                      {isInPlaylist && <Check size={12} color="#fff" />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          )}
+          <View style={styles.songInfo}>
+            <Text style={styles.songTitle} numberOfLines={1}>
+              {song.name}
+            </Text>
+            <Text style={styles.songArtist} numberOfLines={1}>
+              {song.artists}
+            </Text>
+          </View>
+
+          <Text style={styles.songDuration}>
+            {song.duration ? formatDuration(song.duration) : '--:--'}
+          </Text>
+        </View>
+
+        {/* Controls with up/down arrows */}
+        <View style={styles.songControls}>
+          {/* Move Up/Down Arrows */}
+          <View style={styles.moveControls}>
+            <TouchableOpacity
+              style={[styles.moveButton, !canMoveUp && styles.moveButtonDisabled]}
+              onPress={() => handleMoveSongUp(index)}
+              activeOpacity={0.7}
+              disabled={!canMoveUp || loading}
+            >
+              <ChevronUp size={16} color={canMoveUp ? "#1DB954" : "#333"} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.moveButton, !canMoveDown && styles.moveButtonDisabled]}
+              onPress={() => handleMoveSongDown(index)}
+              activeOpacity={0.7}
+              disabled={!canMoveDown || loading}
+            >
+              <ChevronDown size={16} color={canMoveDown ? "#1DB954" : "#333"} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Remove Button */}
+          <TouchableOpacity
+            style={styles.removeButton}
+            onPress={() => currentPlaylist && handleRemoveFromPlaylist(currentPlaylist, song)}
+            activeOpacity={0.7}
+            disabled={loading}
+          >
+            <X size={18} color="#ff6b6b" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderAddSongsMode = () => {
+    if (!currentPlaylist) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyTitle}>Playlist not found</Text>
         </View>
       );
     }
+
+    return (
+      <ScrollView style={styles.playlistsList} showsVerticalScrollIndicator={false}>
+        <View style={styles.playlistHeader}>
+          <Text style={styles.playlistHeaderTitle}>{currentPlaylist.name}</Text>
+          <Text style={styles.playlistHeaderSubtitle}>
+            {currentPlaylist.songs.length} song{currentPlaylist.songs.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
+
+        {currentPlaylist.songs.length === 0 ? (
+          <View style={styles.emptyPlaylistContainer}>
+            <Music size={48} color="#333" />
+            <Text style={styles.emptyPlaylistTitle}>No songs in this playlist</Text>
+            <Text style={styles.emptyPlaylistSubtitle}>
+              Add some downloaded songs to get started
+            </Text>
+          </View>
+        ) : (
+          currentPlaylist.songs.map((song, index) => renderPlaylistSong(song, index))
+        )}
+      </ScrollView>
+    );
+  };
+
+  const renderRegularMode = () => {
+    return (
+      <ScrollView style={styles.playlistsList} showsVerticalScrollIndicator={false}>
+        {playlists.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Music size={48} color="#333" />
+            <Text style={styles.emptyTitle}>No Playlists Yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Create your first playlist to organize your music
+            </Text>
+          </View>
+        ) : (
+          playlists.map(renderPlaylistItem)
+        )}
+      </ScrollView>
+    );
   };
 
   return (
@@ -177,52 +303,42 @@ export function AddToPlaylistModal({ visible, song, onClose, onCreatePlaylist }:
               <X size={24} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.title}>
-              {song ? 'Add to Playlist' : 'Manage Playlists'}
+              {isAddSongsMode ? 'Manage Playlist' : song ? 'Add to Playlist' : 'Manage Playlists'}
             </Text>
             <View style={styles.placeholder} />
           </View>
 
-          {/* Song Info */}
-          {song && (
-            <View style={styles.songInfo}>
-              <Text style={styles.songName} numberOfLines={1}>
+          {/* Song Info (only in regular mode with specific song) */}
+          {song && !isAddSongsMode && (
+            <View style={styles.songInfoHeader}>
+              <Text style={styles.songNameHeader} numberOfLines={1}>
                 {song.name}
               </Text>
-              <Text style={styles.artistName} numberOfLines={1}>
+              <Text style={styles.artistNameHeader} numberOfLines={1}>
                 {song.artists}
               </Text>
             </View>
           )}
 
-          {/* Create New Playlist */}
-          <TouchableOpacity
-            style={styles.createPlaylistButton}
-            onPress={() => {
-              onClose();
-              onCreatePlaylist?.();
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.createPlaylistIcon}>
-              <Plus size={20} color="#1DB954" />
-            </View>
-            <Text style={styles.createPlaylistText}>Create New Playlist</Text>
-          </TouchableOpacity>
-
-          {/* Playlists List */}
-          <ScrollView style={styles.playlistsList} showsVerticalScrollIndicator={false}>
-            {playlists.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Music size={48} color="#333" />
-                <Text style={styles.emptyTitle}>No Playlists Yet</Text>
-                <Text style={styles.emptySubtitle}>
-                  Create your first playlist to organize your music
-                </Text>
+          {/* Create New Playlist (only in regular mode) */}
+          {!isAddSongsMode && (
+            <TouchableOpacity
+              style={styles.createPlaylistButton}
+              onPress={() => {
+                onClose();
+                onCreatePlaylist?.();
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.createPlaylistIcon}>
+                <Plus size={20} color="#1DB954" />
               </View>
-            ) : (
-              playlists.map(renderPlaylistItem)
-            )}
-          </ScrollView>
+              <Text style={styles.createPlaylistText}>Create New Playlist</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Content */}
+          {isAddSongsMode ? renderAddSongsMode() : renderRegularMode()}
         </SafeAreaView>
       </LinearGradient>
     </Modal>
@@ -259,19 +375,19 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 44,
   },
-  songInfo: {
+  songInfoHeader: {
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
-  songName: {
+  songNameHeader: {
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     marginBottom: 4,
   },
-  artistName: {
+  artistNameHeader: {
     color: '#888',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
@@ -336,60 +452,96 @@ const styles = StyleSheet.create({
     backgroundColor: '#1DB954',
     borderColor: '#1DB954',
   },
-  playlistSection: {
+  playlistHeader: {
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: '#333',
   },
-  playlistSectionTitle: {
+  playlistHeaderTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  playlistHeaderSubtitle: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  songItem: {
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 16,
+    marginVertical: 2,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  songContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  songAlbumArt: {
+    width: 48,
+    height: 48,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  songInfo: {
+    flex: 1,
+  },
+  songTitle: {
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Medium',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  playlistSectionSubtitle: {
+  songArtist: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  songDuration: {
     color: '#888',
     fontSize: 12,
     fontFamily: 'Inter-Regular',
-    marginBottom: 12,
+    marginRight: 12,
+    minWidth: 40,
+    textAlign: 'right',
   },
-  noSongsText: {
-    color: '#666',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    fontStyle: 'italic',
+  songControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 12,
   },
-  songsScroll: {
-    marginTop: 8,
+  moveControls: {
+    flexDirection: 'row',
+    gap: 4,
   },
-  songItem: {
-    width: 120,
-    padding: 8,
-    marginRight: 8,
-    backgroundColor: '#333',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#444',
-  },
-  songItemInPlaylist: {
-    backgroundColor: 'rgba(29, 185, 84, 0.1)',
-    borderColor: '#1DB954',
-  },
-  songCheckButton: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#666',
+  moveButton: {
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'flex-end',
-    marginTop: 4,
+    borderRadius: 16,
+    backgroundColor: 'rgba(29, 185, 84, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(29, 185, 84, 0.3)',
   },
-  songCheckButtonActive: {
-    backgroundColor: '#1DB954',
-    borderColor: '#1DB954',
+  moveButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: '#333',
+  },
+  removeButton: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
   },
   emptyContainer: {
     flex: 1,
@@ -407,6 +559,26 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptySubtitle: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyPlaylistContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingTop: 60,
+  },
+  emptyPlaylistTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyPlaylistSubtitle: {
     color: '#888',
     fontSize: 14,
     fontFamily: 'Inter-Regular',

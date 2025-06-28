@@ -341,6 +341,7 @@ export default function PlaylistDetailScreen() {
         <AddToPlaylistModal
           visible={showAddSongsModal}
           song={null}
+          playlistId={playlist.id}
           onClose={() => setShowAddSongsModal(false)}
         />
 
