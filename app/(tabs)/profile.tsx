@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import {
   Settings,
   Bell,
@@ -19,9 +20,13 @@ import {
   Download,
   Upload,
   Info,
+  LogOut,
+  User as UserIcon,
 } from 'lucide-react-native';
 import { dataManager } from '../../services/dataManager';
+import { userService, type User } from '../../services/userService';
 import { useToast } from '../../hooks/useToast';
+import { Toast } from '../../components/Toast';
 
 interface ProfileOption {
   id: string;
@@ -31,11 +36,21 @@ interface ProfileOption {
 }
 
 export default function ProfileScreen() {
-  const { showToast } = useToast();
+  const { toast, showToast, hideToast } = useToast();
   const [storageInfo, setStorageInfo] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     loadStorageInfo();
+    
+    // Listen for user changes
+    const handleUserChange = (user: User | null) => {
+      setCurrentUser(user);
+    };
+
+    userService.addListener(handleUserChange);
+    return () => userService.removeListener(handleUserChange);
   }, []);
 
   const loadStorageInfo = async () => {
@@ -45,6 +60,36 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error('Error loading storage info:', error);
     }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout? You will need to register again to use the app.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            const success = await userService.logout();
+            if (success) {
+              showToast({
+                message: 'Logged out successfully',
+                type: 'success',
+              });
+              // Navigate back to registration
+              router.replace('/register');
+            } else {
+              showToast({
+                message: 'Failed to logout',
+                type: 'error',
+              });
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleClearAllData = () => {
@@ -135,6 +180,14 @@ export default function ProfileScreen() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
   const profileOptions: ProfileOption[] = [
     {
       id: '1',
@@ -181,6 +234,15 @@ export default function ProfileScreen() {
     },
   ];
 
+  const accountOptions: ProfileOption[] = [
+    {
+      id: 'logout',
+      title: 'Logout',
+      icon: <LogOut size={20} color="#ff4444" />,
+      onPress: handleLogout,
+    },
+  ];
+
   const renderOption = (option: ProfileOption) => (
     <TouchableOpacity
       key={option.id}
@@ -207,14 +269,17 @@ export default function ProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Image
-              source={{
-                uri: 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=300',
-              }}
-              style={styles.avatar}
-            />
-            <Text style={styles.name}>Music Lover</Text>
-            <Text style={styles.email}>musiclover@example.com</Text>
+            <View style={styles.avatarContainer}>
+              <UserIcon size={48} color="#fff" strokeWidth={1.5} />
+            </View>
+            <Text style={styles.name}>
+              {currentUser?.username || 'Music Lover'}
+            </Text>
+            {currentUser && (
+              <Text style={styles.memberSince}>
+                Member since {formatDate(currentUser.registeredAt)}
+              </Text>
+            )}
           </View>
 
           <View style={styles.optionsContainer}>
@@ -229,12 +294,29 @@ export default function ProfileScreen() {
             {storageOptions.map(renderOption)}
           </View>
 
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Account</Text>
+          </View>
+
+          <View style={styles.optionsContainer}>
+            {accountOptions.map(renderOption)}
+          </View>
+
           <View style={styles.bottomInfo}>
-            <Text style={styles.appName}>Spotify Clone</Text>
+            <Text style={styles.appName}>Bolt Music</Text>
             <Text style={styles.version}>Version 1.0.0</Text>
             <Text style={styles.madeWith}>Made with ❤️ using Expo</Text>
           </View>
         </ScrollView>
+
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            visible={toast.visible}
+            onHide={hideToast}
+          />
+        )}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -255,11 +337,22 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 32,
   },
-  avatar: {
+  avatarContainer: {
     width: 120,
     height: 120,
     borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 16,
   },
   name: {
     color: '#fff',
@@ -267,7 +360,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     marginBottom: 4,
   },
-  email: {
+  memberSince: {
     color: '#fff',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
@@ -303,6 +396,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 40,
     paddingHorizontal: 16,
+    marginBottom: 40,
   },
   appName: {
     color: '#fff',
