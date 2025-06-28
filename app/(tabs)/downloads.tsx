@@ -221,9 +221,12 @@ export default function DownloadsScreen() {
               </Text>
             </View>
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.scrollView} 
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
               {downloadedSongs.map(renderSongItem)}
-              <View style={styles.bottomPadding} />
             </ScrollView>
           </>
         )}
@@ -254,7 +257,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingBottom: 70, // Space for mini player + tab bar
   },
   header: {
     flexDirection: 'row',
@@ -311,6 +313,9 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 140, // Space for mini player + tab bar
   },
   songItem: {
     flexDirection: 'row',
@@ -376,8 +381,5 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 107, 107, 0.1)',
-  },
-  bottomPadding: {
-    height: 20,
   },
 });

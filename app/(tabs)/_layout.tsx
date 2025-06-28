@@ -14,6 +14,10 @@ export default function TabLayout() {
           paddingTop: 8,
           paddingBottom: Platform.OS === 'ios' ? 34 : 8,
           height: Platform.OS === 'ios' ? 90 : 60,
+          position: 'absolute', // Make tab bar float above content
+          bottom: 0,
+          left: 0,
+          right: 0,
         },
         tabBarActiveTintColor: '#1DB954',
         tabBarInactiveTintColor: '#888',

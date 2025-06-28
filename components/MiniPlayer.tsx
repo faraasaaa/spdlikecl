@@ -110,15 +110,12 @@ export function MiniPlayer({ onPress }: MiniPlayerProps) {
 
   const song = playbackStatus.currentSong;
 
-  // Calculate bottom position to sit exactly on top of tab bar
-  const tabBarHeight = Platform.OS === 'ios' ? 90 : 60;
-
   return (
     <Animated.View
       style={[
         styles.container,
         {
-          bottom: tabBarHeight,
+          bottom: 0, // Position at the very bottom
           transform: [{ translateY: slideAnim }],
         },
       ]}
@@ -210,7 +207,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-    zIndex: 100,
+    zIndex: 1000, // Ensure it's above everything else
   },
   progressContainer: {
     height: 2,
