@@ -110,12 +110,15 @@ export function MiniPlayer({ onPress }: MiniPlayerProps) {
 
   const song = playbackStatus.currentSong;
 
+  // Calculate the bottom position to be above the tab bar
+  const tabBarHeight = Platform.OS === 'ios' ? 90 : 60;
+
   return (
     <Animated.View
       style={[
         styles.container,
         {
-          bottom: 0, // Position at the very bottom
+          bottom: tabBarHeight, // Position above tab bar
           transform: [{ translateY: slideAnim }],
         },
       ]}

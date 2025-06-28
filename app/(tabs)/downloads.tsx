@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 140, // Space for mini player + tab bar
+    paddingBottom: 160, // Space for mini player + tab bar
   },
   songItem: {
     flexDirection: 'row',
