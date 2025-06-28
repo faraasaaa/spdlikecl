@@ -18,16 +18,12 @@ class PlaybackService {
     repeatMode: 'off',
   };
   private listeners: Set<(queue: PlaybackQueue) => void> = new Set();
-  private isPlaying: boolean = false;
   private currentPlaylistId: string | null = null;
 
   constructor() {
-    // Listen to audio service for song end events
-    audioService.addListener((status) => {
-      if (!status.isPlaying && status.currentSong && this.queue.songs.length > 0) {
-        // Song ended, play next if available
-        this.handleSongEnd();
-      }
+    // Set up the song end callback to handle automatic progression
+    audioService.setOnSongEndCallback(() => {
+      this.handleSongEnd();
     });
   }
 
@@ -66,11 +62,7 @@ class PlaybackService {
     };
 
     this.notifyListeners();
-    const success = await this.playCurrentSong();
-    if (success) {
-      this.isPlaying = true;
-    }
-    return success;
+    return await this.playCurrentSong();
   }
 
   async playSong(song: DownloadedSong): Promise<boolean> {
@@ -83,28 +75,21 @@ class PlaybackService {
     };
 
     this.notifyListeners();
-    const success = await this.playCurrentSong();
-    if (success) {
-      this.isPlaying = true;
-    }
-    return success;
+    return await this.playCurrentSong();
   }
 
   async pause(): Promise<void> {
     await audioService.pause();
-    this.isPlaying = false;
     this.notifyListeners();
   }
 
   async resume(): Promise<void> {
     await audioService.resume();
-    this.isPlaying = true;
     this.notifyListeners();
   }
 
   async stop(): Promise<void> {
     await audioService.stop();
-    this.isPlaying = false;
     this.currentPlaylistId = null;
     this.queue = { songs: [], currentIndex: 0, isShuffled: false, repeatMode: 'off' };
     this.notifyListeners();
@@ -131,6 +116,13 @@ class PlaybackService {
   async playPrevious(): Promise<boolean> {
     if (this.queue.songs.length === 0) return false;
 
+    // If we're more than 3 seconds into the song, restart it
+    const currentPosition = audioService.getPosition();
+    if (currentPosition > 3000) {
+      await audioService.seekTo(0);
+      return true;
+    }
+
     let prevIndex = this.queue.currentIndex - 1;
 
     if (prevIndex < 0) {
@@ -138,6 +130,9 @@ class PlaybackService {
         prevIndex = this.queue.songs.length - 1;
       } else {
         prevIndex = 0;
+        // Just restart the current song if we can't go back
+        await audioService.seekTo(0);
+        return true;
       }
     }
 
@@ -217,6 +212,10 @@ class PlaybackService {
     return this.queue;
   }
 
+  getCurrentPlaylistId(): string | null {
+    return this.currentPlaylistId;
+  }
+
   hasNext(): boolean {
     if (this.queue.songs.length === 0) return false;
     return this.queue.currentIndex < this.queue.songs.length - 1 || this.queue.repeatMode === 'all';
@@ -234,6 +233,7 @@ class PlaybackService {
       isShuffled: false,
       repeatMode: 'off',
     };
+    this.currentPlaylistId = null;
     this.notifyListeners();
   }
 }

@@ -18,6 +18,7 @@ class AudioService {
   private duration: number = 0;
   private listeners: Set<(status: PlaybackStatus) => void> = new Set();
   private positionUpdateInterval: NodeJS.Timeout | null = null;
+  private onSongEndCallback: (() => void) | null = null;
 
   constructor() {
     this.initializeAudio();
@@ -47,6 +48,10 @@ class AudioService {
 
   removeListener(callback: (status: PlaybackStatus) => void) {
     this.listeners.delete(callback);
+  }
+
+  setOnSongEndCallback(callback: (() => void) | null) {
+    this.onSongEndCallback = callback;
   }
 
   private notifyListeners() {
@@ -84,6 +89,11 @@ class AudioService {
               this.isPlaying = false;
               this.position = 0;
               this.notifyListeners();
+              
+              // Call the song end callback if set
+              if (this.onSongEndCallback) {
+                this.onSongEndCallback();
+              }
             }
           }
         } catch (error) {
@@ -199,15 +209,19 @@ class AudioService {
 
   async skipToNext(): Promise<void> {
     // This will be handled by the playback service
-    // For now, just stop the current song
-    await this.stop();
+    // For now, just notify that we want to skip
+    if (this.onSongEndCallback) {
+      this.onSongEndCallback();
+    }
   }
 
   async skipToPrevious(): Promise<void> {
     // This will be handled by the playback service
-    // For now, restart the current song
-    if (this.currentSong) {
+    // For now, restart the current song if position > 3 seconds, otherwise go to previous
+    if (this.position > 3000) {
       await this.seekTo(0);
+    } else if (this.onSongEndCallback) {
+      this.onSongEndCallback();
     }
   }
 
@@ -221,6 +235,11 @@ class AudioService {
         this.position = 0;
         this.stopPositionUpdates();
         this.notifyListeners();
+        
+        // Call the song end callback if set
+        if (this.onSongEndCallback) {
+          this.onSongEndCallback();
+        }
       }
     }
     

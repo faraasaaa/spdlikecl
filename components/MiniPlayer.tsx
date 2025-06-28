@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Play, Pause, SkipForward, Heart } from 'lucide-react-native';
 import { audioService, type PlaybackStatus } from '../services/audioService';
+import { playbackService } from '../services/playbackService';
 
 interface MiniPlayerProps {
   onPress?: () => void;
@@ -66,7 +67,7 @@ export function MiniPlayer({ onPress }: MiniPlayerProps) {
 
   const handleNext = async (e: any) => {
     e.stopPropagation();
-    await audioService.skipToNext();
+    await playbackService.playNext();
   };
 
   const toggleLike = (e: any) => {

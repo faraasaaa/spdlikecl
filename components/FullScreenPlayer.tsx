@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronDown, MoveHorizontal as MoreHorizontal, Heart, Shuffle, SkipBack, Play, Pause, SkipForward, Repeat, Volume2, Share, List } from 'lucide-react-native';
 import { audioService, type PlaybackStatus } from '../services/audioService';
+import { playbackService } from '../services/playbackService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -136,11 +137,11 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
   };
 
   const handleNext = async () => {
-    await audioService.skipToNext();
+    await playbackService.playNext();
   };
 
   const handlePrevious = async () => {
-    await audioService.skipToPrevious();
+    await playbackService.playPrevious();
   };
 
   const toggleLike = () => {
@@ -148,14 +149,13 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
   };
 
   const toggleShuffle = () => {
-    setIsShuffled(!isShuffled);
+    const newShuffleState = playbackService.toggleShuffle();
+    setIsShuffled(newShuffleState);
   };
 
   const toggleRepeat = () => {
-    const modes: Array<'off' | 'all' | 'one'> = ['off', 'all', 'one'];
-    const currentIndex = modes.indexOf(repeatMode);
-    const nextIndex = (currentIndex + 1) % modes.length;
-    setRepeatMode(modes[nextIndex]);
+    const newRepeatMode = playbackService.toggleRepeat();
+    setRepeatMode(newRepeatMode);
   };
 
   const formatTime = (milliseconds: number) => {
