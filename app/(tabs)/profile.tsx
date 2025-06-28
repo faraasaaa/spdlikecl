@@ -14,14 +14,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Settings,
-  Bell,
   ChevronRight,
   Database,
   Trash2,
   Download,
   Upload,
   Info,
-  LogOut,
   User as UserIcon,
 } from 'lucide-react-native';
 import { dataManager } from '../../services/dataManager';
@@ -62,36 +60,6 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error('Error loading storage info:', error);
     }
-  };
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout? You will need to register again to use the app.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await userService.logout();
-            if (success) {
-              showToast({
-                message: 'Logged out successfully',
-                type: 'success',
-              });
-              // Navigate back to registration
-              router.replace('/register');
-            } else {
-              showToast({
-                message: 'Failed to logout',
-                type: 'error',
-              });
-            }
-          },
-        },
-      ]
-    );
   };
 
   const handleClearAllData = () => {
@@ -197,12 +165,6 @@ export default function ProfileScreen() {
       icon: <Settings size={20} color="#888" />,
       onPress: () => console.log('Open settings'),
     },
-    {
-      id: '2',
-      title: 'Notifications',
-      icon: <Bell size={20} color="#888" />,
-      onPress: () => console.log('Open notifications'),
-    },
   ];
 
   const storageOptions: ProfileOption[] = [
@@ -233,15 +195,6 @@ export default function ProfileScreen() {
       title: 'Clear All Data',
       icon: <Trash2 size={20} color="#ff4444" />,
       onPress: handleClearAllData,
-    },
-  ];
-
-  const accountOptions: ProfileOption[] = [
-    {
-      id: 'logout',
-      title: 'Logout',
-      icon: <LogOut size={20} color="#ff4444" />,
-      onPress: handleLogout,
     },
   ];
 
@@ -295,14 +248,6 @@ export default function ProfileScreen() {
 
           <View style={styles.optionsContainer}>
             {storageOptions.map(renderOption)}
-          </View>
-
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Account</Text>
-          </View>
-
-          <View style={styles.optionsContainer}>
-            {accountOptions.map(renderOption)}
           </View>
 
           <View style={styles.bottomInfo}>
