@@ -11,15 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import {
-  ArrowLeft,
-  Wrench,
-  Plus,
-  ChevronRight,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-} from 'lucide-react-native';
+import { ArrowLeft, Wrench, Plus, ChevronRight, Clock, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { settingsService, type FixSongReport, type AddSongRequest } from '../../services/settingsService';
 import { FixSongModal } from '../../components/FixSongModal';
 import { AddSongModal } from '../../components/AddSongModal';
