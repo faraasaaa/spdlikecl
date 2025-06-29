@@ -19,11 +19,11 @@ import {
   Trash2,
   Download,
   Upload,
-  Info,
   User as UserIcon,
 } from 'lucide-react-native';
 import { dataManager } from '../../services/dataManager';
 import { userService, type User } from '../../services/userService';
+import { storageService } from '../../services/storageService';
 import { useToast } from '../../hooks/useToast';
 import { Toast } from '../../components/Toast';
 
@@ -38,11 +38,13 @@ export default function ProfileScreen() {
   const { toast, showToast, hideToast } = useToast();
   const [storageInfo, setStorageInfo] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadStorageInfo();
+    loadUserData();
     
     // Listen for user changes
     const handleUserChange = (user: User | null) => {
@@ -52,6 +54,32 @@ export default function ProfileScreen() {
     userService.addListener(handleUserChange);
     return () => userService.removeListener(handleUserChange);
   }, []);
+
+  const loadUserData = async () => {
+    try {
+      // Try to get user from userService first
+      const user = userService.getCurrentUser();
+      if (user) {
+        setCurrentUser(user);
+        setUsername(user.username);
+        return;
+      }
+
+      // Fallback to checking storage directly for username
+      const savedUsername = await storageService.loadData<string>('username');
+      if (savedUsername) {
+        setUsername(savedUsername);
+        // Create a user object if we only have username
+        const userObj: User = {
+          username: savedUsername,
+          registeredAt: Date.now(), // We don't have the actual registration date
+        };
+        setCurrentUser(userObj);
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
 
   const loadStorageInfo = async () => {
     try {
@@ -116,32 +144,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleVerifyData = async () => {
-    try {
-      const integrity = await dataManager.verifyDataIntegrity();
-      const issues = integrity.issues.length;
-
-      if (issues === 0) {
-        showToast({
-          message: 'Data integrity check passed',
-          type: 'success',
-        });
-      } else {
-        Alert.alert(
-          'Data Integrity Issues',
-          `Found ${issues} issue(s):\n${integrity.issues.join('\n')}`,
-          [{ text: 'OK' }]
-        );
-      }
-    } catch (error) {
-      console.error('Error verifying data:', error);
-      showToast({
-        message: 'Failed to verify data integrity',
-        type: 'error',
-      });
-    }
-  };
-
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -179,12 +181,6 @@ export default function ProfileScreen() {
       onPress: loadStorageInfo,
     },
     {
-      id: 'verify-data',
-      title: 'Verify Data Integrity',
-      icon: <Info size={20} color="#888" />,
-      onPress: handleVerifyData,
-    },
-    {
       id: 'backup-data',
       title: 'Backup Data',
       icon: <Upload size={20} color="#888" />,
@@ -213,6 +209,9 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
+  const displayName = username || currentUser?.username || 'Guest User';
+  const registrationDate = currentUser?.registeredAt;
+
   return (
     <LinearGradient
       colors={['#1DB954', '#1a1a1a', '#000']}
@@ -229,11 +228,11 @@ export default function ProfileScreen() {
               <UserIcon size={48} color="#fff" strokeWidth={1.5} />
             </View>
             <Text style={styles.name}>
-              {currentUser?.username || 'Guest User'}
+              {displayName}
             </Text>
-            {currentUser && (
+            {registrationDate && (
               <Text style={styles.memberSince}>
-                Member since {formatDate(currentUser.registeredAt)}
+                Member since {formatDate(registrationDate)}
               </Text>
             )}
           </View>
