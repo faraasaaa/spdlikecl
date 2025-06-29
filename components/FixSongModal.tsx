@@ -7,13 +7,13 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Wrench, Music } from 'lucide-react-native';
+import { X, Wrench, Music, Check } from 'lucide-react-native';
 import { downloadService, type DownloadedSong } from '../services/downloadService';
 import { settingsService, type FixSongReport } from '../services/settingsService';
-import { TrackCard } from './TrackCard';
 
 interface FixSongModalProps {
   visible: boolean;
@@ -73,41 +73,49 @@ export function FixSongModal({ visible, onClose, onSuccess }: FixSongModalProps)
     }
   };
 
-  const renderSongItem = (song: DownloadedSong) => (
-    <TouchableOpacity
-      key={song.id}
-      style={[
-        styles.songItem,
-        selectedSong?.id === song.id && styles.selectedSongItem
-      ]}
-      onPress={() => handleSongSelect(song)}
-      activeOpacity={0.7}
-    >
-      <TrackCard
-        track={{
-          id: song.id,
-          name: song.name,
-          artists: [{ id: '', name: song.artists }],
-          album: {
-            id: '',
-            name: song.album,
-            images: [{ url: song.coverUrl, height: 300, width: 300 }]
-          },
-          duration_ms: song.duration || 0,
-          preview_url: null,
-          external_urls: { spotify: '' }
-        }}
-        showDownload={false}
-        showAddToPlaylist={false}
-        isSearchResult={false}
-      />
-      {selectedSong?.id === song.id && (
-        <View style={styles.selectedIndicator}>
-          <Text style={styles.selectedText}>Selected</Text>
+  const renderSongItem = (song: DownloadedSong) => {
+    const isSelected = selectedSong?.id === song.id;
+    
+    return (
+      <TouchableOpacity
+        key={song.id}
+        style={[
+          styles.songItem,
+          isSelected && styles.selectedSongItem
+        ]}
+        onPress={() => handleSongSelect(song)}
+        activeOpacity={0.7}
+      >
+        <Image
+          source={{ uri: song.coverUrl }}
+          style={styles.albumArt}
+        />
+        
+        <View style={styles.songInfo}>
+          <Text style={[
+            styles.songName,
+            isSelected && styles.selectedText
+          ]} numberOfLines={1}>
+            {song.name}
+          </Text>
+          <Text style={styles.artistName} numberOfLines={1}>
+            {song.artists}
+          </Text>
+          <Text style={styles.albumName} numberOfLines={1}>
+            {song.album}
+          </Text>
         </View>
-      )}
-    </TouchableOpacity>
-  );
+
+        <View style={styles.selectionIndicator}>
+          {isSelected && (
+            <View style={styles.checkContainer}>
+              <Check size={16} color="#fff" strokeWidth={2} />
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <Modal
@@ -296,31 +304,63 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   songItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     marginHorizontal: 16,
     marginVertical: 4,
     borderRadius: 8,
     backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: '#333',
-    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   selectedSongItem: {
     borderColor: '#1DB954',
     backgroundColor: 'rgba(29, 185, 84, 0.1)',
   },
-  selectedIndicator: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#1DB954',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  albumArt: {
+    width: 56,
+    height: 56,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  songInfo: {
+    flex: 1,
+  },
+  songName: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 2,
   },
   selectedText: {
-    color: '#fff',
-    fontSize: 10,
-    fontFamily: 'Inter-SemiBold',
+    color: '#1DB954',
+  },
+  artistName: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 2,
+  },
+  albumName: {
+    color: '#666',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+  },
+  selectionIndicator: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#1DB954',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   footer: {
     paddingHorizontal: 16,
