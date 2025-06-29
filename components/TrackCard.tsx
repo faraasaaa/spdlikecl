@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Play, MoveHorizontal as MoreHorizontal, Plus } from 'lucide-react-native';
 import { DownloadButton } from './DownloadButton';
 import { useToast } from '../hooks/useToast';
 import type { SpotifyTrack } from '../types/spotify';
@@ -33,7 +32,7 @@ export function TrackCard({
   const handleDownloadComplete = (success: boolean, message: string) => {
     showToast({
       message,
-      type: success ? 'success' : 'error',
+      type: success ? 'success' : 'info', // Changed error to info for "not available" messages
     });
   };
 
@@ -75,18 +74,6 @@ export function TrackCard({
             onDownloadComplete={handleDownloadComplete}
           />
         )}
-        
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={onPlayPress}
-          activeOpacity={0.7}
-        >
-          <Play size={16} color="#1DB954" fill="#1DB954" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-          <MoreHorizontal size={16} color="#888" />
-        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
