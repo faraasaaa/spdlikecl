@@ -229,7 +229,7 @@ export default function ProfileScreen() {
               <UserIcon size={48} color="#fff" strokeWidth={1.5} />
             </View>
             <Text style={styles.name}>
-              {currentUser?.username || 'Music Lover'}
+              {currentUser?.username || 'Guest User'}
             </Text>
             {currentUser && (
               <Text style={styles.memberSince}>
