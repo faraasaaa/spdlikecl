@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { CacheService } from './cacheService';
+import { settingsService } from './settingsService';
 
 export interface Notification {
   id: number;
@@ -36,6 +37,7 @@ class NotificationService {
 
   constructor() {
     this.cache = new CacheService();
+    this.initializeStatusNotifications();
   }
 
   addListener(callback: () => void) {
@@ -48,6 +50,69 @@ class NotificationService {
 
   private notifyListeners() {
     this.listeners.forEach(callback => callback());
+  }
+
+  // Initialize status notifications checking
+  private initializeStatusNotifications() {
+    // Listen to settings service for status changes
+    settingsService.addListener(() => {
+      this.checkForApprovedItems();
+    });
+  }
+
+  private async checkForApprovedItems() {
+    try {
+      const fixReports = settingsService.getAllFixReports();
+      const addRequests = settingsService.getAllAddRequests();
+      
+      // Check for newly approved items and create notifications
+      const approvedFixes = fixReports.filter(report => report.status === 'approved');
+      const approvedAdds = addRequests.filter(request => request.status === 'approved');
+      
+      // Create notifications for approved items
+      for (const fix of approvedFixes) {
+        await this.createApprovalNotification('fix', fix.name, fix.id);
+      }
+      
+      for (const add of approvedAdds) {
+        await this.createApprovalNotification('add', 'Song Addition Request', add.add_id);
+      }
+    } catch (error) {
+      console.error('Error checking for approved items:', error);
+    }
+  }
+
+  private async createApprovalNotification(type: 'fix' | 'add', songName: string, id: string) {
+    try {
+      // Check if we already created a notification for this item
+      const notificationKey = `notification_${type}_${id}`;
+      const alreadyNotified = await this.cache.get(notificationKey);
+      
+      if (alreadyNotified) {
+        return; // Already created notification for this item
+      }
+
+      const title = type === 'fix' 
+        ? `Song Fixed: ${songName}` 
+        : `Song Added: Request Approved`;
+      
+      const content = type === 'fix'
+        ? `Your reported song "${songName}" has been fixed and is now available for download.`
+        : `Your song addition request has been approved and the song is now available in our database.`;
+
+      // Create notification via API
+      await this.createNotification({
+        title,
+        content,
+        author: 'TuneIn System',
+        img_url: 'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg?auto=compress&cs=tinysrgb&w=300',
+      });
+
+      // Mark as notified
+      await this.cache.set(notificationKey, true, 86400); // Cache for 24 hours
+    } catch (error) {
+      console.error('Error creating approval notification:', error);
+    }
   }
 
   async getAllNotifications(forceRefresh = false): Promise<NotificationResult> {
