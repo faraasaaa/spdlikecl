@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { CacheService } from './cacheService';
 import { settingsService } from './settingsService';
+import { storageService } from './storageService';
 
 export interface Notification {
   id: number;
@@ -27,6 +28,7 @@ class NotificationService {
   private baseUrl = 'https://faras1334.pythonanywhere.com';
   private cache: CacheService;
   private listeners: Set<() => void> = new Set();
+  private statusCheckInterval: NodeJS.Timeout | null = null;
 
   static getInstance(): NotificationService {
     if (!NotificationService.instance) {
@@ -54,10 +56,15 @@ class NotificationService {
 
   // Initialize status notifications checking
   private initializeStatusNotifications() {
-    // Listen to settings service for status changes
-    settingsService.addListener(() => {
+    // Check for approved items every 30 seconds
+    this.statusCheckInterval = setInterval(() => {
       this.checkForApprovedItems();
-    });
+    }, 30000);
+
+    // Initial check after 5 seconds
+    setTimeout(() => {
+      this.checkForApprovedItems();
+    }, 5000);
   }
 
   private async checkForApprovedItems() {
@@ -69,15 +76,23 @@ class NotificationService {
       const approvedFixes = fixReports.filter(report => report.status === 'approved');
       const approvedAdds = addRequests.filter(request => request.status === 'approved');
       
-      // Create notifications for approved items
+      // Create notifications for approved items and then clean them up
       for (const fix of approvedFixes) {
-        await this.createApprovalNotification('fix', fix.name, fix.id);
+        const notificationCreated = await this.createApprovalNotification('fix', fix.name, fix.id);
+        if (notificationCreated) {
+          // Remove the fix report details after creating notification
+          await this.removeFixReportDetails(fix.id);
+        }
       }
       
       for (const add of approvedAdds) {
         // Try to get song name from API response if available
         const songName = await this.getSongNameFromAddedAPI(add.add_id);
-        await this.createApprovalNotification('add', songName || 'Song Addition Request', add.add_id);
+        const notificationCreated = await this.createApprovalNotification('add', songName || 'Song Addition Request', add.add_id);
+        if (notificationCreated) {
+          // Remove the add request details after creating notification
+          await this.removeAddRequestDetails(add.add_id);
+        }
       }
     } catch (error) {
       console.error('Error checking for approved items:', error);
@@ -105,14 +120,14 @@ class NotificationService {
     return null;
   }
 
-  private async createApprovalNotification(type: 'fix' | 'add', songName: string, id: string) {
+  private async createApprovalNotification(type: 'fix' | 'add', songName: string, id: string): Promise<boolean> {
     try {
       // Check if we already created a notification for this item
       const notificationKey = `notification_${type}_${id}`;
       const alreadyNotified = await this.cache.get(notificationKey);
       
       if (alreadyNotified) {
-        return; // Already created notification for this item
+        return false; // Already created notification for this item
       }
 
       const title = type === 'fix' 
@@ -124,17 +139,49 @@ class NotificationService {
         : `Your song addition request for "${songName}" has been approved and the song is now available in our database.`;
 
       // Create notification via API
-      await this.createNotification({
+      const result = await this.createNotification({
         title,
         content,
         author: 'TuneIn System',
         img_url: 'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg?auto=compress&cs=tinysrgb&w=300',
       });
 
-      // Mark as notified
-      await this.cache.set(notificationKey, true, 86400); // Cache for 24 hours
+      if (result.success) {
+        // Mark as notified
+        await this.cache.set(notificationKey, true, 86400); // Cache for 24 hours
+        
+        // Clear notifications cache to force refresh
+        await this.clearCache();
+        
+        return true;
+      }
+      
+      return false;
     } catch (error) {
       console.error('Error creating approval notification:', error);
+      return false;
+    }
+  }
+
+  private async removeFixReportDetails(reportId: string): Promise<void> {
+    try {
+      const allReports = await settingsService.getAllFixReports();
+      const updatedReports = allReports.filter(report => report.id !== reportId);
+      await storageService.saveData('fix_reports', updatedReports);
+      console.log(`Removed fix report details for ID: ${reportId}`);
+    } catch (error) {
+      console.error('Error removing fix report details:', error);
+    }
+  }
+
+  private async removeAddRequestDetails(addId: string): Promise<void> {
+    try {
+      const allRequests = await settingsService.getAllAddRequests();
+      const updatedRequests = allRequests.filter(request => request.add_id !== addId);
+      await storageService.saveData('add_requests', updatedRequests);
+      console.log(`Removed add request details for ID: ${addId}`);
+    } catch (error) {
+      console.error('Error removing add request details:', error);
     }
   }
 
@@ -290,6 +337,14 @@ class NotificationService {
         success: false,
         message: errorMessage
       };
+    }
+  }
+
+  // Cleanup method to stop interval when service is destroyed
+  destroy(): void {
+    if (this.statusCheckInterval) {
+      clearInterval(this.statusCheckInterval);
+      this.statusCheckInterval = null;
     }
   }
 }
