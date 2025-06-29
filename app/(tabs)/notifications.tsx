@@ -12,7 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Bell, RefreshCw, CircleAlert as AlertCircle, Calendar, User as UserIcon } from 'lucide-react-native';
+import { Bell, RefreshCw, CircleAlert as AlertCircle, Calendar, User as UserIcon, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { notificationService, type Notification } from '../../services/notificationService';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
@@ -22,6 +22,7 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedNotifications, setExpandedNotifications] = useState<Set<number>>(new Set());
   const { toast, showToast, hideToast } = useToast();
   const insets = useSafeAreaInsets();
 
@@ -77,6 +78,18 @@ export default function NotificationsScreen() {
     loadNotifications();
   }, [loadNotifications]);
 
+  const toggleNotificationExpansion = useCallback((notificationId: number) => {
+    setExpandedNotifications(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(notificationId)) {
+        newSet.delete(notificationId);
+      } else {
+        newSet.add(notificationId);
+      }
+      return newSet;
+    });
+  }, []);
+
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -104,61 +117,89 @@ export default function NotificationsScreen() {
     }
   };
 
-  const renderNotificationItem = (notification: Notification) => (
-    <TouchableOpacity
-      key={notification.id}
-      style={styles.notificationItem}
-      activeOpacity={0.7}
-      onPress={() => {
-        // Handle notification tap - could open a detail view
-        console.log('Notification tapped:', notification.title);
-      }}
-    >
-      <View style={styles.notificationHeader}>
-        <View style={styles.notificationImageContainer}>
-          {notification.img_url ? (
-            <Image
-              source={{ uri: notification.img_url }}
-              style={styles.notificationImage}
-              defaultSource={{ uri: 'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg?auto=compress&cs=tinysrgb&w=300' }}
-            />
-          ) : (
-            <View style={styles.notificationImagePlaceholder}>
-              <Bell size={24} color="#1DB954" />
-            </View>
-          )}
-        </View>
+  const isContentLong = (content: string) => {
+    return content.length > 120; // Threshold for showing expand/collapse
+  };
 
-        <View style={styles.notificationContent}>
-          <Text style={styles.notificationTitle} numberOfLines={2}>
-            {notification.title}
-          </Text>
-          
-          <View style={styles.notificationMeta}>
-            <View style={styles.metaItem}>
-              <UserIcon size={12} color="#888" />
-              <Text style={styles.metaText}>{notification.author}</Text>
-            </View>
+  const getTruncatedContent = (content: string) => {
+    if (content.length <= 120) return content;
+    return content.substring(0, 120) + '...';
+  };
+
+  const renderNotificationItem = (notification: Notification) => {
+    const isExpanded = expandedNotifications.has(notification.id);
+    const contentIsLong = isContentLong(notification.content);
+    const displayContent = isExpanded || !contentIsLong 
+      ? notification.content 
+      : getTruncatedContent(notification.content);
+
+    return (
+      <View key={notification.id} style={styles.notificationItem}>
+        <View style={styles.notificationHeader}>
+          <View style={styles.notificationImageContainer}>
+            {notification.img_url ? (
+              <Image
+                source={{ uri: notification.img_url }}
+                style={styles.notificationImage}
+                defaultSource={{ uri: 'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg?auto=compress&cs=tinysrgb&w=300' }}
+              />
+            ) : (
+              <View style={styles.notificationImagePlaceholder}>
+                <Bell size={24} color="#1DB954" />
+              </View>
+            )}
+          </View>
+
+          <View style={styles.notificationContent}>
+            <Text style={styles.notificationTitle} numberOfLines={2}>
+              {notification.title}
+            </Text>
             
-            <View style={styles.metaItem}>
-              <Calendar size={12} color="#888" />
-              <Text style={styles.metaText}>{formatDate(notification.display_date)}</Text>
+            <View style={styles.notificationMeta}>
+              <View style={styles.metaItem}>
+                <UserIcon size={12} color="#888" />
+                <Text style={styles.metaText}>{notification.author}</Text>
+              </View>
+              
+              <View style={styles.metaItem}>
+                <Calendar size={12} color="#888" />
+                <Text style={styles.metaText}>{formatDate(notification.display_date)}</Text>
+              </View>
             </View>
+          </View>
+
+          <View style={styles.timestampContainer}>
+            <Text style={styles.timestamp}>
+              {formatTimestamp(notification.timestamp)}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.timestampContainer}>
-          <Text style={styles.timestamp}>
-            {formatTimestamp(notification.timestamp)}
+        <View style={styles.notificationBodyContainer}>
+          <Text style={styles.notificationBody}>
+            {displayContent}
           </Text>
+          
+          {contentIsLong && (
+            <TouchableOpacity
+              style={styles.expandButton}
+              onPress={() => toggleNotificationExpansion(notification.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.expandButtonText}>
+                {isExpanded ? 'Show less' : 'Show more'}
+              </Text>
+              {isExpanded ? (
+                <ChevronUp size={16} color="#1DB954" />
+              ) : (
+                <ChevronDown size={16} color="#1DB954" />
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-
-      <Text style={styles.notificationBody} numberOfLines={3}>
-        {notification.content}
-      </Text>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const renderContent = () => {
     if (loading) {
@@ -366,11 +407,32 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'Inter-Regular',
   },
+  notificationBodyContainer: {
+    marginTop: 4,
+  },
   notificationBody: {
     color: '#ccc',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     lineHeight: 20,
+  },
+  expandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(29, 185, 84, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(29, 185, 84, 0.3)',
+    gap: 4,
+  },
+  expandButtonText: {
+    color: '#1DB954',
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
   },
   centerContainer: {
     flex: 1,
