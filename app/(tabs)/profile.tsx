@@ -7,22 +7,30 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import {
   Settings,
   ChevronRight,
   Database,
   Trash2,
   Upload,
+  Download,
+  FileText,
   User as UserIcon,
 } from 'lucide-react-native';
 import { dataManager } from '../../services/dataManager';
 import { userService, type User } from '../../services/userService';
 import { storageService } from '../../services/storageService';
+import { downloadService } from '../../services/downloadService';
+import { playlistService } from '../../services/playlistService';
 import { useToast } from '../../hooks/useToast';
 import { Toast } from '../../components/Toast';
 
@@ -33,11 +41,45 @@ interface ProfileOption {
   onPress: () => void;
 }
 
+interface ExportData {
+  version: string;
+  exportDate: string;
+  user: {
+    username: string;
+    registeredAt: number;
+  };
+  downloadedSongs: Array<{
+    id: string;
+    name: string;
+    artists: string;
+    album: string;
+    coverUrl: string;
+    downloadedAt: number;
+    duration?: number;
+  }>;
+  playlists: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    coverUrl?: string;
+    songs: Array<{
+      id: string;
+      name: string;
+      artists: string;
+      album: string;
+    }>;
+    createdAt: number;
+    updatedAt: number;
+  }>;
+}
+
 export default function ProfileScreen() {
   const { toast, showToast, hideToast } = useToast();
   const [storageInfo, setStorageInfo] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -86,6 +128,212 @@ export default function ProfileScreen() {
       setStorageInfo(info);
     } catch (error) {
       console.error('Error loading storage info:', error);
+    }
+  };
+
+  const handleExportData = async () => {
+    try {
+      setIsExporting(true);
+      
+      // Gather all user data
+      const downloadedSongs = downloadService.getAllDownloadedSongs();
+      const playlists = playlistService.getAllPlaylists();
+      const user = userService.getCurrentUser();
+
+      if (!user) {
+        showToast({
+          message: 'No user data found to export',
+          type: 'error',
+        });
+        return;
+      }
+
+      // Create export data structure
+      const exportData: ExportData = {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        user: {
+          username: user.username,
+          registeredAt: user.registeredAt,
+        },
+        downloadedSongs: downloadedSongs.map(song => ({
+          id: song.id,
+          name: song.name,
+          artists: song.artists,
+          album: song.album,
+          coverUrl: song.coverUrl,
+          downloadedAt: song.downloadedAt,
+          duration: song.duration,
+        })),
+        playlists: playlists.map(playlist => ({
+          id: playlist.id,
+          name: playlist.name,
+          description: playlist.description,
+          coverUrl: playlist.coverUrl,
+          songs: playlist.songs.map(song => ({
+            id: song.id,
+            name: song.name,
+            artists: song.artists,
+            album: song.album,
+          })),
+          createdAt: playlist.createdAt,
+          updatedAt: playlist.updatedAt,
+        })),
+      };
+
+      // Create filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `tunein_backup_${user.username}_${timestamp}.json`;
+      
+      // Convert to JSON string
+      const jsonString = JSON.stringify(exportData, null, 2);
+      
+      // Save to device
+      const fileUri = `${FileSystem.documentDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, jsonString);
+      
+      // Share the file
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Export TuneIn Data',
+        });
+      }
+
+      showToast({
+        message: `Data exported successfully as ${filename}`,
+        type: 'success',
+      });
+
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      showToast({
+        message: 'Failed to export data',
+        type: 'error',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportData = async () => {
+    try {
+      setIsImporting(true);
+
+      // Pick a JSON file
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/json',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        setIsImporting(false);
+        return;
+      }
+
+      const file = result.assets[0];
+      
+      // Read the file content
+      const fileContent = await FileSystem.readAsStringAsync(file.uri);
+      const importData: ExportData = JSON.parse(fileContent);
+
+      // Validate the import data
+      if (!importData.version || !importData.downloadedSongs || !importData.playlists) {
+        throw new Error('Invalid backup file format');
+      }
+
+      // Show confirmation dialog
+      Alert.alert(
+        'Import Data',
+        `This will import ${importData.downloadedSongs.length} songs and ${importData.playlists.length} playlists from ${importData.user?.username || 'unknown user'}.\n\nThis will download all songs and may take some time. Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Import',
+            style: 'default',
+            onPress: () => performImport(importData),
+          },
+        ]
+      );
+
+    } catch (error) {
+      console.error('Error importing data:', error);
+      showToast({
+        message: 'Failed to read import file. Please check the file format.',
+        type: 'error',
+      });
+      setIsImporting(false);
+    }
+  };
+
+  const performImport = async (importData: ExportData) => {
+    try {
+      let successCount = 0;
+      let failCount = 0;
+
+      showToast({
+        message: 'Starting import process...',
+        type: 'info',
+      });
+
+      // Download all songs from the import data
+      for (const songData of importData.downloadedSongs) {
+        try {
+          const result = await downloadService.downloadSong(songData.id);
+          if (result.success) {
+            successCount++;
+          } else {
+            failCount++;
+            console.log(`Failed to download song: ${songData.name} - ${result.message}`);
+          }
+        } catch (error) {
+          failCount++;
+          console.error(`Error downloading song ${songData.name}:`, error);
+        }
+      }
+
+      // Wait a bit for downloads to settle
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Import playlists
+      let playlistCount = 0;
+      for (const playlistData of importData.playlists) {
+        try {
+          // Create the playlist
+          const playlist = await playlistService.createPlaylist({
+            name: playlistData.name,
+            description: playlistData.description,
+            coverUrl: playlistData.coverUrl,
+          });
+
+          // Add songs to the playlist (only if they were successfully downloaded)
+          for (const songData of playlistData.songs) {
+            const downloadedSong = downloadService.getDownloadedSong(songData.id);
+            if (downloadedSong) {
+              await playlistService.addSongToPlaylist(playlist.id, downloadedSong);
+            }
+          }
+
+          playlistCount++;
+        } catch (error) {
+          console.error(`Error creating playlist ${playlistData.name}:`, error);
+        }
+      }
+
+      // Show final result
+      showToast({
+        message: `Import completed! Downloaded ${successCount} songs, failed ${failCount}, created ${playlistCount} playlists.`,
+        type: successCount > 0 ? 'success' : 'info',
+      });
+
+    } catch (error) {
+      console.error('Error performing import:', error);
+      showToast({
+        message: 'Import process failed',
+        type: 'error',
+      });
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -168,6 +416,29 @@ export default function ProfileScreen() {
     },
   ];
 
+  const dataOptions: ProfileOption[] = [
+    {
+      id: 'export-data',
+      title: 'Export All Data',
+      icon: isExporting ? (
+        <ActivityIndicator size={20} color="#1DB954" />
+      ) : (
+        <Download size={20} color="#1DB954" />
+      ),
+      onPress: handleExportData,
+    },
+    {
+      id: 'import-data',
+      title: 'Import Data',
+      icon: isImporting ? (
+        <ActivityIndicator size={20} color="#1DB954" />
+      ) : (
+        <Upload size={20} color="#1DB954" />
+      ),
+      onPress: handleImportData,
+    },
+  ];
+
   const storageOptions: ProfileOption[] = [
     {
       id: 'storage-info',
@@ -182,7 +453,7 @@ export default function ProfileScreen() {
     {
       id: 'backup-data',
       title: 'Backup Data',
-      icon: <Upload size={20} color="#888" />,
+      icon: <FileText size={20} color="#888" />,
       onPress: handleBackupData,
     },
     {
@@ -196,8 +467,16 @@ export default function ProfileScreen() {
   const renderOption = (option: ProfileOption) => (
     <TouchableOpacity
       key={option.id}
-      style={styles.option}
+      style={[
+        styles.option,
+        (isExporting && option.id === 'export-data') || 
+        (isImporting && option.id === 'import-data') ? styles.optionDisabled : null
+      ]}
       onPress={option.onPress}
+      disabled={
+        (isExporting && option.id === 'export-data') || 
+        (isImporting && option.id === 'import-data')
+      }
       activeOpacity={0.7}
     >
       <View style={styles.optionLeft}>
@@ -242,6 +521,14 @@ export default function ProfileScreen() {
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Data Management</Text>
+          </View>
+
+          <View style={styles.optionsContainer}>
+            {dataOptions.map(renderOption)}
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Storage & Backup</Text>
           </View>
 
           <View style={styles.optionsContainer}>
@@ -327,6 +614,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomColor: 'rgba(255,255,255,0.1)',
     borderBottomWidth: 1,
+  },
+  optionDisabled: {
+    opacity: 0.6,
   },
   optionLeft: {
     flexDirection: 'row',
