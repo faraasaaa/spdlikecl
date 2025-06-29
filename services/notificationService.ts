@@ -62,8 +62,8 @@ class NotificationService {
 
   private async checkForApprovedItems() {
     try {
-      const fixReports = await settingsService.getAllFixReports();
-      const addRequests = await settingsService.getAllAddRequests();
+      const fixReports = (await settingsService.getAllFixReports()) ?? [];
+      const addRequests = (await settingsService.getAllAddRequests()) ?? [];
       
       // Check for newly approved items and create notifications
       const approvedFixes = fixReports.filter(report => report.status === 'approved');
