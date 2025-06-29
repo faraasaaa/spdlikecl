@@ -251,9 +251,9 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.bottomInfo}>
-            <Text style={styles.appName}>Bolt Music</Text>
-            <Text style={styles.version}>Version 1.0.0</Text>
-            <Text style={styles.madeWith}>Made with ❤️ using Expo</Text>
+            <Text style={styles.appName}>TuneIn</Text>
+            <Text style={styles.version}>Version 1.0.1</Text>
+            <Text style={styles.madeWith}>Made by Faras</Text>
           </View>
         </ScrollView>
 
