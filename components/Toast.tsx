@@ -22,8 +22,8 @@ interface ToastProps extends ToastConfig {
   onHide: () => void;
 }
 
-export function Toast({ message, type, duration = 4000, visible, onHide }: ToastProps) {
-  const [slideAnim] = useState(new Animated.Value(-100));
+export function Toast({ message, type, duration = 5000, visible, onHide }: ToastProps) {
+  const [slideAnim] = useState(new Animated.Value(-200));
   const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export function Toast({ message, type, duration = 4000, visible, onHide }: Toast
   const hideToast = () => {
     Animated.parallel([
       Animated.spring(slideAnim, {
-        toValue: -100,
+        toValue: -200,
         useNativeDriver: true,
         tension: 100,
         friction: 8,
@@ -110,7 +110,7 @@ export function Toast({ message, type, duration = 4000, visible, onHide }: Toast
     >
       <View style={styles.content}>
         {getIcon()}
-        <Text style={styles.message} numberOfLines={3}>
+        <Text style={styles.message} numberOfLines={4}>
           {message}
         </Text>
       </View>
@@ -129,24 +129,25 @@ export function Toast({ message, type, duration = 4000, visible, onHide }: Toast
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 60,
+    top: 80,
     left: 16,
     right: 16,
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 8,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    zIndex: 1000,
-    minHeight: 56,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 12,
+    zIndex: 9999,
+    minHeight: 64,
+    maxWidth: width - 32,
   },
   content: {
     flex: 1,
@@ -156,15 +157,17 @@ const styles = StyleSheet.create({
   },
   message: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Inter-Medium',
     flex: 1,
-    lineHeight: 20,
-    paddingTop: 2, // Align with icon
+    lineHeight: 22,
+    paddingTop: 1, // Align with icon
   },
   closeButton: {
-    padding: 4,
-    marginLeft: 8,
+    padding: 6,
+    marginLeft: 12,
     marginTop: -2,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
 });
