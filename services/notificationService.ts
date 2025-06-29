@@ -75,11 +75,34 @@ class NotificationService {
       }
       
       for (const add of approvedAdds) {
-        await this.createApprovalNotification('add', 'Song Addition Request', add.add_id);
+        // Try to get song name from API response if available
+        const songName = await this.getSongNameFromAddedAPI(add.add_id);
+        await this.createApprovalNotification('add', songName || 'Song Addition Request', add.add_id);
       }
     } catch (error) {
       console.error('Error checking for approved items:', error);
     }
+  }
+
+  private async getSongNameFromAddedAPI(addId: string): Promise<string | null> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/showadded`, { timeout: 5000 });
+      
+      if (response.status === 200) {
+        const addedSongs = response.data.added_songs || [];
+        const song = addedSongs.find((song: any) => song.add_id === addId);
+        
+        if (song && song.name && song.artists) {
+          return `${song.name} by ${song.artists}`;
+        } else if (song && song.name) {
+          return song.name;
+        }
+      }
+    } catch (error) {
+      console.log('Could not fetch song details from API');
+    }
+    
+    return null;
   }
 
   private async createApprovalNotification(type: 'fix' | 'add', songName: string, id: string) {
@@ -94,11 +117,11 @@ class NotificationService {
 
       const title = type === 'fix' 
         ? `Song Fixed: ${songName}` 
-        : `Song Added: Request Approved`;
+        : `Song Added: ${songName}`;
       
       const content = type === 'fix'
         ? `Your reported song "${songName}" has been fixed and is now available for download.`
-        : `Your song addition request has been approved and the song is now available in our database.`;
+        : `Your song addition request for "${songName}" has been approved and the song is now available in our database.`;
 
       // Create notification via API
       await this.createNotification({
