@@ -15,23 +15,30 @@ export interface DownloadedSong {
   fileSize?: number;
 }
 
-export interface NewAPIDownloadResponse {
-  data: {
-    message: string;
-    track_info: {
-      album: string;
-      artist: string;
-      title: string;
-    };
-    upload_url: string;
-  };
-  status: string;
+export interface DownloadResponse {
+  album: string;
+  artist: string;
+  chat_id: number;
+  download_link: string;
+  expires_in_seconds: number;
+  file_id: string;
+  file_type: string;
+  file_unique_id: string;
+  message_id: number;
+  spotify_cover_url: string;
+  spotify_track_id: string;
+  title: string;
+}
+
+export interface DownloadErrorResponse {
+  error: string;
 }
 
 class DownloadService {
   private downloadedSongs: Map<string, DownloadedSong> = new Map();
   private listeners: Set<() => void> = new Set();
   private baseUrl = 'https://conventional-malena-noneoool-355b1774.koyeb.app';
+  private needSongsUrl = 'https://faras1334.pythonanywhere.com';
   private currentlyDownloading: Set<string> = new Set(); // Track songs being downloaded
 
   constructor() {
@@ -106,41 +113,27 @@ class DownloadService {
       this.currentlyDownloading.add(trackId);
       this.notifyListeners();
 
-      // Get detailed track info from Spotify API
-      const spotifyTrack = await spotifyApi.getTrack(trackId);
-      if (!spotifyTrack) {
+      // Get download information from the new API
+      const downloadData = await this.getDownloadInfo(trackId);
+      
+      if (!downloadData) {
+        // Song not found, send to needs songs API
+        await this.sendToNeedSongs(trackId);
         this.currentlyDownloading.delete(trackId);
         this.notifyListeners();
         return {
           success: false,
-          message: 'Failed to get track details from Spotify'
+          message: 'Song not available yet. We\'ll add it to our database soon!'
         };
       }
-
-      // Construct Spotify URL for the new API
-      const spotifyUrl = spotifyTrack.external_urls.spotify;
-
-      // Get download URL from the new API
-      const downloadData = await this.getDownloadUrlFromNewAPI(spotifyUrl);
-      if (!downloadData || downloadData.status !== 'success') {
-        this.currentlyDownloading.delete(trackId);
-        this.notifyListeners();
-        return {
-          success: false,
-          message: 'Failed to get download URL'
-        };
-      }
-
-      // Wait 4 seconds as required by the API
-      await new Promise(resolve => setTimeout(resolve, 4000));
 
       // For web platform, we'll simulate the download
       let localPath: string;
       if (Platform.OS === 'web') {
         // Trigger browser download
         const link = document.createElement('a');
-        link.href = downloadData.data.upload_url;
-        link.download = `${downloadData.data.track_info.title}.mp3`;
+        link.href = downloadData.download_link;
+        link.download = `${downloadData.title}.mp3`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -150,8 +143,8 @@ class DownloadService {
       } else {
         // Download the file for mobile
         const downloadedPath = await this.downloadFile(
-          downloadData.data.upload_url,
-          `${downloadData.data.track_info.title}.mp3`,
+          downloadData.download_link,
+          `${downloadData.title}.mp3`,
           trackId
         );
 
@@ -166,20 +159,18 @@ class DownloadService {
         localPath = downloadedPath;
       }
 
-      // Download cover image from Spotify data
-      const coverUrl = spotifyTrack.album.images[0]?.url;
-      const coverPath = await this.downloadCoverImage(coverUrl, trackId);
+      // Download cover image
+      const coverPath = await this.downloadCoverImage(downloadData.spotify_cover_url, trackId);
 
-      // Create song metadata using Spotify details
+      // Create song metadata using API response
       const song: DownloadedSong = {
         id: trackId,
-        name: spotifyTrack.name,
-        artists: spotifyTrack.artists.map(artist => artist.name).join(', '),
-        album: spotifyTrack.album.name,
-        coverUrl: coverPath || coverUrl,
+        name: downloadData.title,
+        artists: downloadData.artist,
+        album: downloadData.album,
+        coverUrl: coverPath || downloadData.spotify_cover_url,
         localPath,
         downloadedAt: Date.now(),
-        duration: spotifyTrack.duration_ms,
       };
 
       // Save to local storage
@@ -207,26 +198,57 @@ class DownloadService {
     }
   }
 
-  private async getDownloadUrlFromNewAPI(spotifyUrl: string): Promise<NewAPIDownloadResponse | null> {
+  private async getDownloadInfo(trackId: string): Promise<DownloadResponse | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/download`, {
-        method: 'POST',
+      const response = await fetch(`${this.baseUrl}/download?id=${trackId}`, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          spotify_url: spotifyUrl,
-        }),
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          // Track not found
+          return null;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      
+      // Check if response contains error
+      if (data.error) {
+        if (data.error === 'Track with the specified Spotify ID not found.') {
+          return null;
+        }
+        throw new Error(data.error);
+      }
+
+      return data as DownloadResponse;
     } catch (error) {
-      console.error('Error getting download URL from new API:', error);
-      return null;
+      console.error('Error getting download info:', error);
+      if (error instanceof Error && error.message.includes('not found')) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async sendToNeedSongs(trackId: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.needSongsUrl}/needsongs?spotify=${trackId}`, {
+        method: 'GET',
+      });
+
+      if (response.ok) {
+        console.log(`Successfully sent track ${trackId} to needs songs API`);
+      } else {
+        console.warn(`Failed to send track ${trackId} to needs songs API: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error sending to needs songs API:', error);
+      // Don't throw error here as it's not critical for the user experience
     }
   }
 
