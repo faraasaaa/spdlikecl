@@ -237,8 +237,14 @@ class DownloadService {
 
   private async sendToNeedSongs(trackId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.needSongsUrl}/needsongs?spotify=${trackId}`, {
-        method: 'GET',
+      const response = await fetch(`${this.needSongsUrl}/needsongs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          spotify: trackId
+        }),
       });
 
       if (response.ok) {

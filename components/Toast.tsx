@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
+  TouchableOpacity,
 } from 'react-native';
 import { Check, X, CircleAlert as AlertCircle } from 'lucide-react-native';
 
@@ -21,41 +22,61 @@ interface ToastProps extends ToastConfig {
   onHide: () => void;
 }
 
-export function Toast({ message, type, duration = 3000, visible, onHide }: ToastProps) {
+export function Toast({ message, type, duration = 4000, visible, onHide }: ToastProps) {
   const [slideAnim] = useState(new Animated.Value(-100));
+  const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     if (visible) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }).start();
-
-      const timer = setTimeout(() => {
+      // Slide in and fade in
+      Animated.parallel([
         Animated.spring(slideAnim, {
-          toValue: -100,
+          toValue: 0,
           useNativeDriver: true,
           tension: 100,
           friction: 8,
-        }).start(() => {
-          onHide();
-        });
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      const timer = setTimeout(() => {
+        hideToast();
       }, duration);
 
       return () => clearTimeout(timer);
     }
-  }, [visible, slideAnim, duration, onHide]);
+  }, [visible, slideAnim, fadeAnim, duration]);
+
+  const hideToast = () => {
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: -100,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onHide();
+    });
+  };
 
   const getIcon = () => {
     switch (type) {
       case 'success':
-        return <Check size={20} color="#fff" />;
+        return <Check size={20} color="#fff" strokeWidth={2} />;
       case 'error':
-        return <X size={20} color="#fff" />;
+        return <X size={20} color="#fff" strokeWidth={2} />;
       case 'info':
-        return <AlertCircle size={20} color="#fff" />;
+        return <AlertCircle size={20} color="#fff" strokeWidth={2} />;
       default:
         return null;
     }
@@ -83,13 +104,24 @@ export function Toast({ message, type, duration = 3000, visible, onHide }: Toast
         { backgroundColor: getBackgroundColor() },
         {
           transform: [{ translateY: slideAnim }],
+          opacity: fadeAnim,
         },
       ]}
     >
-      {getIcon()}
-      <Text style={styles.message} numberOfLines={2}>
-        {message}
-      </Text>
+      <View style={styles.content}>
+        {getIcon()}
+        <Text style={styles.message} numberOfLines={3}>
+          {message}
+        </Text>
+      </View>
+      
+      <TouchableOpacity
+        style={styles.closeButton}
+        onPress={hideToast}
+        activeOpacity={0.7}
+      >
+        <X size={16} color="#fff" strokeWidth={2} />
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -101,7 +133,7 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
@@ -114,12 +146,25 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
     zIndex: 1000,
+    minHeight: 56,
+  },
+  content: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
   },
   message: {
     color: '#fff',
     fontSize: 14,
     fontFamily: 'Inter-Medium',
-    marginLeft: 12,
     flex: 1,
+    lineHeight: 20,
+    paddingTop: 2, // Align with icon
+  },
+  closeButton: {
+    padding: 4,
+    marginLeft: 8,
+    marginTop: -2,
   },
 });
