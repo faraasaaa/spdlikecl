@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Chrome as Home, Download, Bell, ListMusic, User, Settings } from 'lucide-react-native';
+import { Chrome as Home, Download, Bell, ListMusic, User } from 'lucide-react-native';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -88,10 +88,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ size, color }) => (
-            <Settings size={size} color={color} strokeWidth={2} />
-          ),
+          href: null, // This hides the tab from the tab bar
         }}
       />
       <Tabs.Screen

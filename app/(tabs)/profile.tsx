@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
+  Settings,
   ChevronRight,
   Database,
   Trash2,
@@ -158,6 +159,15 @@ export default function ProfileScreen() {
     });
   };
 
+  const profileOptions: ProfileOption[] = [
+    {
+      id: 'settings',
+      title: 'Settings',
+      icon: <Settings size={20} color="#888" />,
+      onPress: () => router.push('/(tabs)/settings'),
+    },
+  ];
+
   const storageOptions: ProfileOption[] = [
     {
       id: 'storage-info',
@@ -224,6 +234,10 @@ export default function ProfileScreen() {
                 Member since {formatDate(registrationDate)}
               </Text>
             )}
+          </View>
+
+          <View style={styles.optionsContainer}>
+            {profileOptions.map(renderOption)}
           </View>
 
           <View style={styles.sectionHeader}>
