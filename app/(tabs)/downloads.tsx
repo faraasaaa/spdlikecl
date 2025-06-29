@@ -121,15 +121,21 @@ export default function DownloadsScreen() {
   };
 
   const handleSongNamePress = async (song: DownloadedSong) => {
-    // When song name is clicked, play the song and open full screen player
-    const success = await playbackService.playSong(song);
-    if (success) {
+    // When song name is clicked, check if it's the current song
+    if (playbackStatus.currentSong?.id === song.id) {
+      // If it's the current song, just open the full screen player
       setShowFullPlayer(true);
     } else {
-      showToast({
-        message: 'Unable to play this song. The file may be corrupted or in an unsupported format.',
-        type: 'error',
-      });
+      // If it's a different song, play it and open full screen player
+      const success = await playbackService.playSong(song);
+      if (success) {
+        setShowFullPlayer(true);
+      } else {
+        showToast({
+          message: 'Unable to play this song. The file may be corrupted or in an unsupported format.',
+          type: 'error',
+        });
+      }
     }
   };
 

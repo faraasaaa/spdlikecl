@@ -38,7 +38,7 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
   const [dragPosition, setDragPosition] = useState(0);
 
   // Memoize the slide animation to prevent recreation
-  const slideAnim = useMemo(() => new Animated.Value(height), []);
+  const slideAnim = useMemo(() => new Animated.Value(height), [height]);
 
   // Stable callback for status updates
   const handleStatusUpdate = useCallback((status: PlaybackStatus) => {
@@ -70,7 +70,7 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
         friction: 8,
       }).start();
     }
-  }, [visible, slideAnim]);
+  }, [visible, slideAnim, height]);
 
   // Memoize pan responder to prevent recreation
   const panResponder = useMemo(() => PanResponder.create({
@@ -133,7 +133,7 @@ export function FullScreenPlayer({ visible, onClose }: FullScreenPlayerProps) {
     }).start(() => {
       onClose();
     });
-  }, [slideAnim, onClose]);
+  }, [slideAnim, onClose, height]);
 
   const handlePlayPause = useCallback(async () => {
     if (playbackStatus.isPlaying) {
